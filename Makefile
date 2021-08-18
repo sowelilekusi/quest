@@ -1,5 +1,5 @@
 TARGET = qtimer
-LIBS   = -lm
+LIBS   = -lm -lncurses -luiohook
 CC     = gcc
 CFLAGS = -g -Wall
 
