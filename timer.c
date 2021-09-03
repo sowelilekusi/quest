@@ -1,58 +1,22 @@
-#include "display.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <unistd.h>
-#include <inttypes.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <string.h>
-#include <uiohook.h>
-#include <wchar.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <signal.h>
-
-#define NS_PER_S 1000000000
-#define K_START 1
-#define K_STOP  2
-#define K_PAUSE 3
-#define K_SPLIT 4
-#define K_CLOSE 5
-
-struct keymap
-{
-	uint16_t START;
-	uint16_t STOP;
-	uint16_t PAUSE;
-	uint16_t SPLIT;
-	uint16_t CLOSE;
-};
-
-struct segment
-{
-	char *name;
-	int *startMS;
-	int *endMS;
-};
+#include "timer.h"
 
 char buf;
 int pipefd[2];
 struct timespec timestart, finish;
-char *gameTitle, *catagoryTitle;
-char *splitPath;
 struct keymap km;
 int h, w;
+char *gameTitle = "title not loaded";
+char *categoryTitle = "category not loaded";
+int attempts = 0;
 
 bool timerActive;
-
-void loadKeymap();
-void start();
-void stop();
-void split();
-void tpause();
-int handleInput();
+struct segment *segments;
+int segmentCount;
+int currentSegment = 0;
+char currentTime[10];
+int deltasEnabled = 1;
+int sgmtdurEnabled = 1;
+int pbEnabled = 1;
 
 void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td)
 {
@@ -134,7 +98,16 @@ void stop()
 
 void split()
 {
-
+	/*
+	struct timespec *temp = malloc(sizeof(struct timespec) * (splitCount + 1));
+	for (int i = 0; i < splitCount; i++) {
+		temp[i] = splits[i];
+	}
+	clock_gettime(CLOCK_REALTIME, &temp[splitCount]);
+	free(splits);
+	splits = temp;
+	splitCount++;
+	*/
 }
 
 void tpause()
@@ -182,25 +155,62 @@ void drawHLine(int row)
 		printf("\033[%d;%dH─", row, i);
 }
 
-void printTime(int row, struct timespec t1, struct timespec t2)
+int ftime(char *timestr, int ms)
 {
-	struct timespec delta;
-	sub_timespec(timestart, finish, &delta);
-	int minutes = delta.tv_sec / 60;
-	int hours   = minutes / 60;
-	printf("\033[%d;1H%01d:%02d:%02ld.%02ld", row, hours, minutes, delta.tv_sec, delta.tv_nsec / 10000000);
+	int displayMS = (ms % 1000) / 10;
+	int seconds = ms / 1000;
+	int minutes = seconds / 60;
+	if (minutes)
+		sprintf(timestr, "%2d:%02d.%02d", minutes, seconds % 60, displayMS);
+	else
+		sprintf(timestr, "%2d.%02d", seconds % 60, displayMS);
+	return 0;
+}
+
+int timespecToMS(struct timespec t)
+{
+	int ms = t.tv_nsec / 1000000;
+	ms += t.tv_sec * 1000;
+	return ms;
+}
+
+void drawSegments()
+{
+	char data[(deltasEnabled * 10) + (sgmtdurEnabled * 10) + (pbEnabled * 10) + 11];
+	char segmentTime[10];
+	char zeroStr[10];
+	ftime(zeroStr, 0);
+	for(int i = 0; i < segmentCount; i++) {
+		if (!ftime(segmentTime, segments[i].realtimeMS)) {
+			sprintf(data, "%10s%10s%10s%10s", zeroStr, zeroStr, zeroStr, segmentTime);
+		} else {
+			sprintf(data, "%s", "Failed to format time");
+		}
+		rghtPrint(6 + i, w, data);
+		leftPrint(6 + i, w, segments[i].name);
+	}
 }
 
 void drawDisplay()
 {
 	clrScreen();
-	cntrPrint(1, w / 2, w, "Game Name");
-	cntrPrint(2, w / 2, w, "Catagory Name");
+	rghtPrint(1, w, "Attempts");
+	char atmpt[10];
+	sprintf(atmpt, "%9d", attempts);
+	rghtPrint(2, w, atmpt);
+	cntrPrint(1, w / 2, w, gameTitle);
+	cntrPrint(2, w / 2, w, categoryTitle);
 	char cols[41];
 	sprintf(cols, "%10s%10s%10s%10s", "Delta", "Sgmt", "Time", "PB");
 	rghtPrint(4, w, cols);
 	drawHLine(5);
-	printTime(6, timestart, finish);
+	printf("\033[5;%dH[dsp]", 2);
+	drawSegments();
+	drawHLine(segmentCount + 6);
+	struct timespec delta;
+	sub_timespec(timestart, finish, &delta);
+	ftime(currentTime, timespecToMS(delta));
+	rghtPrint(segmentCount + 7, w, currentTime);
 	fflush(stdout);
 }
 
@@ -210,6 +220,81 @@ void resize(int i)
 	ioctl(1, TIOCGWINSZ, &ws);
 	w = ws.ws_col;
 	h = ws.ws_row;
+}
+
+void loadFile(char *path)
+{
+	char *buffer = NULL;
+	long length;
+	FILE *f = fopen(path, "rb");
+	if (f == NULL)
+		return;
+
+	fseek(f, 0, SEEK_END);
+	length = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	buffer = malloc(length + 1);
+	if (buffer != NULL) {
+		fread(buffer, 1, length, f);
+	}
+	fclose(f);
+	buffer[length] = '\0';
+	
+	cJSON *splitfile = cJSON_Parse(buffer);
+	cJSON *game = NULL;
+	cJSON *category = NULL;
+	cJSON *attempt = NULL;
+	cJSON *segs = NULL;
+	game = cJSON_GetObjectItemCaseSensitive(splitfile, "game");
+	category = cJSON_GetObjectItemCaseSensitive(splitfile, "category");
+	attempt = cJSON_GetObjectItemCaseSensitive(splitfile, "attempts");
+	segs = cJSON_GetObjectItemCaseSensitive(splitfile, "segments");
+	if (game) {
+		cJSON *title = cJSON_GetObjectItemCaseSensitive(game, "longname");
+		if (cJSON_IsString(title) && (title->valuestring != NULL)) {
+			gameTitle = malloc(strlen(title->valuestring));
+			strcpy(gameTitle, title->valuestring);
+		}
+	}
+	if (category) {
+		cJSON *title = cJSON_GetObjectItemCaseSensitive(category, "longname");
+		if (cJSON_IsString(title) && (title->valuestring != NULL)) {
+			categoryTitle = malloc(strlen(title->valuestring));
+			strcpy(categoryTitle, title->valuestring);
+		}
+	}
+	if (attempt) {
+		cJSON *total = cJSON_GetObjectItemCaseSensitive(attempt, "total");
+		if (cJSON_IsNumber(total))
+			attempts = total->valueint;
+	}
+	if (segs) {
+		int segm = cJSON_GetArraySize(segs);
+		segmentCount = segm;
+		segments = malloc(segmentCount * sizeof(struct segment));
+		int it = 0;
+		cJSON *iterator = NULL;
+		cJSON *segname = NULL;
+		cJSON *segtime = NULL;
+		cJSON_ArrayForEach(iterator, segs) {
+			segname = cJSON_GetObjectItemCaseSensitive(iterator, "name");
+			if (cJSON_IsString(segname) && (segname->valuestring != NULL)) {
+				segments[it].name = malloc(strlen(segname->valuestring));
+				strcpy(segments[it].name, segname->valuestring);
+			}
+			segtime = cJSON_GetObjectItemCaseSensitive(iterator, "endedAt");
+			if (segtime) {
+				cJSON *time = cJSON_GetObjectItemCaseSensitive(segtime, "realtimeMS");
+				cJSON *gtime = cJSON_GetObjectItemCaseSensitive(segtime, "gametimeMS");
+				if (cJSON_IsNumber(time))
+					segments[it].realtimeMS = time->valueint;
+				if (cJSON_IsNumber(gtime))
+					segments[it].gametimeMS = gtime->valueint;
+			}
+			it++;
+		}
+	}
+	cJSON_Delete(splitfile);
 }
 
 int main(int argc, char **argv)
@@ -236,15 +321,17 @@ int main(int argc, char **argv)
 		struct color bg = { 47,  53,  66};
 		struct color fg = {247, 248, 242};
 		initScreen(bg, fg);
+		loadFile(argv[1]);
 		while(!handleInput()) {
 			drawDisplay();
 			if (timerActive) {
 				clock_gettime(CLOCK_REALTIME, &finish);
 			}
-			usleep(3000);
+			usleep(4000);
 		}
 		resetScreen();
 		kill(cpid, SIGTERM);
 	}
 	return 0;
 }
+
