@@ -37,6 +37,8 @@ struct segment
         char *name;
         int realtimeMS;
         int gametimeMS;
+	int pbrealtimeMS;
+	int pbgametimeMS;
         bool isSkipped;
 };
 
@@ -50,10 +52,10 @@ void stop();
 void split();
 void tpause();
 void loadKeymap();
-void drawHLine(int row);
-int ftime(char *timestr, int ms);
+void ftime(char *timestr, bool withMS, int ms);
 int timespecToMS(struct timespec t);
 void drawSegments();
+void drawCurrentSegment();
 void drawDisplay();
 void resize(int i);
 void loadFile(char *path);

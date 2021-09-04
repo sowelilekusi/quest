@@ -1,22 +1,35 @@
 #include "timer.h"
 
+//Timekeeping
+struct timespec timestart, finish;
+int currentMS = 0;
+bool timerActive;
+
+//Global hotkeys
 char buf;
 int pipefd[2];
-struct timespec timestart, finish;
 struct keymap km;
-int h, w;
-char *gameTitle = "title not loaded";
-char *categoryTitle = "category not loaded";
-int attempts = 0;
 
-bool timerActive;
-struct segment *segments;
-int segmentCount;
-int currentSegment = 0;
-char currentTime[10];
+//UI
+int h, w;
 int deltasEnabled = 1;
 int sgmtdurEnabled = 1;
 int pbEnabled = 1;
+bool resized = false;
+
+//Run data
+const char *schemaver  = "v1.0.1";
+const char *timersname = "quest";
+const char *timerlname = "Quinn's Utterly Elegant Speedrun Timer";
+const char *timerver   = "v0.4.0";
+const char *timerlink  = "https://github.com/SilentFungus/quest";
+char *gameTitle = "title not loaded";
+char *categoryTitle = "category not loaded";
+int attempts = 0;
+struct segment *segments;
+int segmentCount;
+int currentSegment = -1;
+char currentTime[10];
 
 void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td)
 {
@@ -87,6 +100,7 @@ void start()
 		return;
 	clock_gettime(CLOCK_REALTIME, &timestart);
 	timerActive = true;
+	currentSegment = 0;
 }
 
 void stop()
@@ -94,10 +108,18 @@ void stop()
 	if (!timerActive)
 		return;
 	timerActive = false;
+	currentSegment = -1;
 }
 
 void split()
 {
+	if (!timerActive)
+		return;
+	segments[currentSegment].realtimeMS = currentMS;
+	segments[currentSegment].gametimeMS = currentMS;
+	currentSegment++;
+	if (currentSegment >= segmentCount)
+		stop();
 	/*
 	struct timespec *temp = malloc(sizeof(struct timespec) * (splitCount + 1));
 	for (int i = 0; i < splitCount; i++) {
@@ -149,22 +171,34 @@ void loadKeymap()
 	//fclose(fp);
 }
 
-void drawHLine(int row)
+void ftime(char *timestr, bool withMS, int ms)
 {
-	for (int i = 0; i <= w; i++)
-		printf("\033[%d;%dH─", row, i);
-}
+	int seconds   = ms / 1000;
+	int minutes   = seconds / 60;
+	int hours     = minutes / 60;
+	//A few better formatted variables for displaying these numbers
+	int tms = (ms % 1000) / 10;
+	int oms = tms / 10;
+	int s   = seconds % 60;
+	int m   = minutes % 60;
+	int h   = hours;
 
-int ftime(char *timestr, int ms)
-{
-	int displayMS = (ms % 1000) / 10;
-	int seconds = ms / 1000;
-	int minutes = seconds / 60;
-	if (minutes)
-		sprintf(timestr, "%2d:%02d.%02d", minutes, seconds % 60, displayMS);
-	else
-		sprintf(timestr, "%2d.%02d", seconds % 60, displayMS);
-	return 0;
+	if (hours) {
+		if (withMS)
+			sprintf(timestr, fulltime, h, abs(h), abs(m), abs(s), abs(tms));
+		else
+			sprintf(timestr, hourstime, h, abs(m), abs(s));
+	} else if (minutes) {
+		if (withMS)
+			sprintf(timestr, sfulltime, m, abs(s), abs(tms));
+		else
+			sprintf(timestr, minutestime, m, abs(s));
+	} else {
+		if (withMS)
+			sprintf(timestr, secondstime, s, abs(tms));
+		else
+			sprintf(timestr, millitime, s, abs(oms));
+	}
 }
 
 int timespecToMS(struct timespec t)
@@ -177,23 +211,63 @@ int timespecToMS(struct timespec t)
 void drawSegments()
 {
 	char data[(deltasEnabled * 10) + (sgmtdurEnabled * 10) + (pbEnabled * 10) + 11];
-	char segmentTime[10];
-	char zeroStr[10];
-	ftime(zeroStr, 0);
+	char segmentTime[11];
+	char zeroStr[11];
+	char deltaTime[11];
+	char sgmtTime[11];
+	char segTime[11];
+	ftime(zeroStr, false, 0);
 	for(int i = 0; i < segmentCount; i++) {
-		if (!ftime(segmentTime, segments[i].realtimeMS)) {
+		ftime(segmentTime, true, segments[i].pbrealtimeMS);
+		if (i >= currentSegment) {
 			sprintf(data, "%10s%10s%10s%10s", zeroStr, zeroStr, zeroStr, segmentTime);
 		} else {
-			sprintf(data, "%s", "Failed to format time");
+			ftime(deltaTime, false, segments[i].realtimeMS - segments[i].pbrealtimeMS);
+			ftime(sgmtTime, false, segments[i].realtimeMS - segments[i - 1].realtimeMS);
+			ftime(segTime, false, segments[i].realtimeMS);
+			sprintf(data, "%10s%10s%10s%10s", deltaTime, sgmtTime, segTime, segmentTime);
 		}
 		rghtPrint(6 + i, w, data);
 		leftPrint(6 + i, w, segments[i].name);
 	}
 }
 
+void drawCurrentSegment()
+{
+	char data[(deltasEnabled * 10) + (sgmtdurEnabled * 10) + (pbEnabled * 10) + 11];
+	strcpy(data, "");
+	char pbTime[11];
+	char deltaTime[11];
+	char sgmtTime[11];
+	char segTime[11];
+	if (deltasEnabled) {
+		ftime(deltaTime, false, currentMS - segments[currentSegment].pbrealtimeMS);
+		strcat(data, deltaTime);
+	}
+	if (sgmtdurEnabled) {
+		if (currentSegment == 0)
+			ftime(sgmtTime, false, currentMS);
+		else
+			ftime(sgmtTime, false, currentMS - segments[currentSegment - 1].realtimeMS);
+		strcat(data, sgmtTime);
+	}
+	ftime(segTime, false, currentMS);
+	strcat(data, segTime);
+	if (pbEnabled) {
+		ftime(pbTime, true, segments[currentSegment].pbrealtimeMS);
+		strcat(data, pbTime);
+	}
+	data[(deltasEnabled * 10) + (sgmtdurEnabled * 10) + (pbEnabled * 10) + 11] = '\0';
+	rghtPrint(6 + currentSegment, w, data);
+	leftPrint(6 + currentSegment, w, segments[currentSegment].name);
+}
+
 void drawDisplay()
 {
-	clrScreen();
+	if (resized) {
+		clrScreen();
+		resized = false;
+	}
 	rghtPrint(1, w, "Attempts");
 	char atmpt[10];
 	sprintf(atmpt, "%9d", attempts);
@@ -203,13 +277,17 @@ void drawDisplay()
 	char cols[41];
 	sprintf(cols, "%10s%10s%10s%10s", "Delta", "Sgmt", "Time", "PB");
 	rghtPrint(4, w, cols);
-	drawHLine(5);
-	printf("\033[5;%dH[dsp]", 2);
+	drawHLine(5, w);
+	printf("\033[5;3H[dsp]");
 	drawSegments();
-	drawHLine(segmentCount + 6);
-	struct timespec delta;
-	sub_timespec(timestart, finish, &delta);
-	ftime(currentTime, timespecToMS(delta));
+	if (timerActive) {
+		drawCurrentSegment();
+		struct timespec delta;
+		sub_timespec(timestart, finish, &delta);
+		currentMS = timespecToMS(delta);
+	}
+	drawHLine(segmentCount + 6, w);
+	ftime(currentTime, true, currentMS);
 	rghtPrint(segmentCount + 7, w, currentTime);
 	fflush(stdout);
 }
@@ -220,6 +298,7 @@ void resize(int i)
 	ioctl(1, TIOCGWINSZ, &ws);
 	w = ws.ws_col;
 	h = ws.ws_row;
+	resized = true;
 }
 
 void loadFile(char *path)
@@ -287,9 +366,9 @@ void loadFile(char *path)
 				cJSON *time = cJSON_GetObjectItemCaseSensitive(segtime, "realtimeMS");
 				cJSON *gtime = cJSON_GetObjectItemCaseSensitive(segtime, "gametimeMS");
 				if (cJSON_IsNumber(time))
-					segments[it].realtimeMS = time->valueint;
+					segments[it].pbrealtimeMS = time->valueint;
 				if (cJSON_IsNumber(gtime))
-					segments[it].gametimeMS = gtime->valueint;
+					segments[it].pbgametimeMS = gtime->valueint;
 			}
 			it++;
 		}
@@ -327,7 +406,7 @@ int main(int argc, char **argv)
 			if (timerActive) {
 				clock_gettime(CLOCK_REALTIME, &finish);
 			}
-			usleep(4000);
+			usleep(5000);
 		}
 		resetScreen();
 		kill(cpid, SIGTERM);

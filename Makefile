@@ -1,4 +1,4 @@
-TARGET = qtimer
+TARGET = quest
 LIBS   = -lm -luiohook
 CC     = gcc
 CFLAGS = -g -Wall

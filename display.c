@@ -1,5 +1,14 @@
 #include "display.h"
 
+const char *millitime   = "%8d.%d";
+const char *secondstime = "%7d.%02d";
+const char *minutestime = "%7d:%02d";
+const char *hourstime   = "%5d:%02d:%02d";
+const char *fulltime    = "%2d:%02d:%02d.%02d";
+const char *sfulltime   = "%4d:%02d.%02d";
+
+struct termios base;
+
 void setBGColor(struct color c)
 {
 	printf("\033[48;2;%d;%d;%dm", c.r, c.g, c.b);
@@ -37,6 +46,11 @@ void stdBuffer()
 
 void initScreen(struct color bg, struct color fg)
 {
+	struct termios t;
+	tcgetattr(1, &base);
+	t = base;
+	t.c_lflag &= (~ECHO & ~ICANON);
+	tcsetattr(1, TCSANOW, &t);
 	altBuffer();
 	setBGColor(bg);
 	setFGColor(fg);
@@ -46,6 +60,7 @@ void initScreen(struct color bg, struct color fg)
 
 void resetScreen()
 {
+	tcsetattr(1, TCSANOW, &base);
 	clrScreen();
 	enableCursor();
 	stdBuffer();
@@ -67,4 +82,11 @@ void rghtPrint(int row, int maxlen, char* text)
 		printf("\033[%d;1H%*s", row, maxlen, text);
 	else
 		printf("\033[%d;1H%.*s", row, maxlen, text);
+}
+
+void drawHLine(int row, int maxlen)
+{
+	for (int i = 0; i <= maxlen; i++) {
+		printf("\033[%d;%dH─", row, i);
+	}
 }
