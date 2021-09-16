@@ -124,6 +124,7 @@ void loadKeymap()
 	km.PAUSE = VC_D;
 	km.SPLIT = VC_E;
 	km.CLOSE = VC_C;
+	km.HOTKS = VC_T;
 	//char path[256];
 	//strcat(strcpy(path, getenv("HOME")), "/.config/qtimer");
 	//mkdir(path, 0777);

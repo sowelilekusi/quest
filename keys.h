@@ -10,6 +10,7 @@
 #define K_PAUSE 3
 #define K_SPLIT 4
 #define K_CLOSE 5
+#define K_HOTKS 6
 
 struct keymap
 {
@@ -18,6 +19,7 @@ struct keymap
 	uint16_t PAUSE;
 	uint16_t SPLIT;
 	uint16_t CLOSE;
+	uint16_t HOTKS;
 };
 
 extern char buf;

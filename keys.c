@@ -1,5 +1,6 @@
 #include "keys.h"
 
+bool hotkeys_enabled = true;
 char buf;
 int pipefd[2];
 struct keymap km;
@@ -22,6 +23,8 @@ void dispatch_proc(uiohook_event * const event) {
 				buf = K_SPLIT;
 			if (event->data.keyboard.keycode == km.CLOSE)
 				buf = K_CLOSE;
+			if (event->data.keyboard.keycode == km.HOTKS)
+				buf = K_HOTKS;
 			write(pipefd[1], &buf, 1);
 		default:
 			break;
@@ -30,7 +33,8 @@ void dispatch_proc(uiohook_event * const event) {
 
 int handleInput()
 {
-	if (read(pipefd[0], &buf, 1) == -1)
+	ssize_t rd = read(pipefd[0], &buf, 1);
+	if ((!hotkeys_enabled && buf != K_HOTKS) || rd == -1)
 		return 0;
 	if (buf == K_SPLIT)
 		split();
@@ -40,6 +44,8 @@ int handleInput()
 		stop();
 	if (buf == K_PAUSE)
 		tpause();
+	if (buf == K_HOTKS)
+		hotkeys_enabled = !hotkeys_enabled;
 	if (buf == K_CLOSE)
 		return 1;
 	return 0;
