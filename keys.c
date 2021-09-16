@@ -11,6 +11,7 @@ bool logger_proc(unsigned int level, const char *format, ...) {
 void dispatch_proc(uiohook_event * const event) {
 	switch (event->type) {
 		case EVENT_KEY_PRESSED:
+			buf = -1;
 			if (event->data.keyboard.keycode == km.START)
 				buf = K_START;
 			if (event->data.keyboard.keycode == km.STOP)
