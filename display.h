@@ -1,6 +1,10 @@
+#ifndef DISPLAY_H
+#define DISPLAY_H
+
 #include <stdio.h>
 #include <string.h>
 #include <termios.h>
+#include <limits.h>
 
 extern const char *millitime;
 extern const char *secondstime;
@@ -8,6 +12,9 @@ extern const char *minutestime;
 extern const char *hourstime;
 extern const char *fulltime;
 extern const char *sfulltime;
+extern int maxrows;
+extern int maxcols;
+extern int colwidth;
 
 struct color {
 	int r;
@@ -28,4 +35,11 @@ void cntrPrint(int row, int col, int maxlen, char *text);
 void leftPrint(int row, int maxlen, char *text);
 void rghtPrint(int row, int maxlem, char *text);
 void drawHLine(int row, int maxlen);
+void drawColumn(char **data, int count, int column);
+void drawRow(char **data, int count, int row);
+void drawCell(char *data, int column, int row);
+void setMaxRows(int rows);
+void setMaxCols(int cols);
+
+#endif
 
