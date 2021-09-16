@@ -19,20 +19,19 @@
 #include "cJSON.h"
 
 #define NS_PER_S 1000000000
+#define cJSON_GetItem(x, y) cJSON_GetObjectItemCaseSensitive(x, y)
 
 struct segment
 {
         char *name;
-        int realtimeMS;
-        //int gametimeMS;
+        int ms;
         bool isSkipped;
 	bool isReset;
 };
 
 struct pastseg
 {
-	int realtimeMS;
-	//int gametimeMS;
+	int ms;
 	bool isSkipped;
 	bool isReset;
 };
@@ -43,6 +42,7 @@ void start();
 void stop();
 void split();
 void tpause();
+void unsplit();
 void reset();
 void loadKeymap();
 void ftime(char *timestr, bool withMS, int ms);

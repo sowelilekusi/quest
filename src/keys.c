@@ -25,6 +25,8 @@ void dispatch_proc(uiohook_event * const event) {
 				buf = K_CLOSE;
 			if (event->data.keyboard.keycode == km.HOTKS)
 				buf = K_HOTKS;
+			if (event->data.keyboard.keycode == km.USPLT)
+				buf = K_USPLT;
 			write(pipefd[1], &buf, 1);
 		default:
 			break;
@@ -46,6 +48,8 @@ int handleInput()
 		tpause();
 	if (buf == K_HOTKS)
 		hotkeys_enabled = !hotkeys_enabled;
+	if (buf == K_USPLT)
+		unsplit();
 	if (buf == K_CLOSE)
 		return 1;
 	return 0;

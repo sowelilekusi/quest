@@ -6,11 +6,13 @@ int currentMS = 0;
 bool timerActive;
 
 //UI
+struct color bg = { 47,  53,  66};
+struct color fg = {247, 248, 242};
 int h, w;
-int deltasEnabled = 1;
-int sgmtdurEnabled = 1;
-int pbEnabled = 1;
-bool resized = false;
+int deltaOn     = 1;
+int sgmtdurOn   = 1;
+int pbOn        = 1;
+bool resized    = false;
 
 //Splits.io data
 const char *schemaver  = "v1.0.1";
@@ -21,18 +23,18 @@ const char *timerlink  = "https://github.com/SilentFungus/quest";
 
 //Run data
 char *filepath;
-char *gameTitle = "title not loaded";
+char *gameTitle     = "title not loaded";
 char *categoryTitle = "category not loaded";
-int attempts = 0;
-int bestTime = 0;
-int bestAttempt = 0;
+int attempts        = 0;
+int bestTime        = 0;
+int bestAttempt     = 0;
 struct segment *segments;
 struct segment *pbrun;
 struct segment *wrrun;
 struct segment *bestsegs;
-struct pastseg *runHistory;
-int segmentCount;
-int currentSegment = -1;
+struct pastseg *pastRuns;
+int segCount;
+int currSeg = -1;
 char currentTime[10];
 
 void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td)
@@ -48,32 +50,23 @@ void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td)
 	}
 }
 
-void add_timespec(struct timespec t1, struct timespec t2, struct timespec* td)
-{	
-	td->tv_nsec = t2.tv_nsec + t1.tv_nsec;
-	td->tv_sec  = t2.tv_sec  + t1.tv_sec;
-	if (td->tv_nsec < 0) {
-		td->tv_nsec += NS_PER_S;
-		td->tv_sec++;
-	}
-}
-
 void reset()
 {
 	if (!timerActive)
 		return;
-	segments[currentSegment].isReset = true;
+	segments[currSeg].isReset = true;
 	stop();
+	currSeg = -1;
 }
 
 void start()
 {
-	if (timerActive || segmentCount == 0)
+	if (timerActive || segCount == 0)
 		return;
 	clock_gettime(CLOCK_REALTIME, &timestart);
-	timerActive = true;
-	resized = true;
-	currentSegment = 0;
+	timerActive    = true;
+	resized        = true;
+	currSeg = 0;
 }
 
 void stop()
@@ -82,34 +75,36 @@ void stop()
 		return;
 	timerActive = false;
 	attempts++;
-	if (runHistory)
-		runHistory = realloc(runHistory, attempts * segmentCount * sizeof(struct pastseg));
+	if (pastRuns)
+		pastRuns = realloc(pastRuns, attempts * segCount * sizeof(struct pastseg));
 	else
-		runHistory = calloc(segmentCount, sizeof(struct pastseg));
-	for (int i = 0; i < segmentCount; i++) {
+		pastRuns = calloc(segCount, sizeof(struct pastseg));
+	for (int i = 0; i < segCount; i++) {
 		struct pastseg t;
-		t.realtimeMS = segments[i].realtimeMS;
+		t.ms = segments[i].ms;
 		t.isSkipped  = segments[i].isSkipped;
 		t.isReset    = segments[i].isReset;
-		runHistory[((attempts-1) * segmentCount) + i] = t;
+		pastRuns[((attempts-1) * segCount) + i] = t;
 	}
 	calculatePB();
 	saveFile();
-	if (currentSegment >= segmentCount) {
-		//reset();
-	}
 }
 
 void split()
 {
 	if (!timerActive)
 		return;
-	segments[currentSegment].realtimeMS = currentMS;
-	//segments[currentSegment].gametimeMS = currentMS;
-	currentSegment++;
-	if (currentSegment >= segmentCount)
+	segments[currSeg].ms = currentMS;
+	currSeg++;
+	if (currSeg >= segCount)
 		stop();
-	resized = true;
+}
+
+void unsplit()
+{
+	if (!timerActive)
+		return;
+	currSeg--;
 }
 
 void tpause()
@@ -125,40 +120,16 @@ void loadKeymap()
 	km.SPLIT = VC_E;
 	km.CLOSE = VC_C;
 	km.HOTKS = VC_T;
-	//char path[256];
-	//strcat(strcpy(path, getenv("HOME")), "/.config/qtimer");
-	//mkdir(path, 0777);
-	//strcat(strcpy(path, getenv("HOME")), "/.config/qtimer/keymaps");
-	//mkdir(path, 0777);
-	//strcat(strcpy(path, getenv("HOME")), "/.config/qtimer/keymaps/default");
-	
-	//FILE* fp = fopen(path, "r");
-	
-	//if (fp == NULL) {
-		//km.START = VC_R;
-		//km.STOP  = VC_F;
-		//km.PAUSE = VC_D;
-		//km.SPLIT = VC_E;
-		//fp = fopen(path, "w");
-		//fprintf(fp, "START = R\n");
-		//fprintf(fp, "STOP  = F\n");
-		//fprintf(fp, "PAUSE = D\n");
-		//fprintf(fp, "SPLIT = E\n");
-		//fclose(fp);
-	//} else {
-		
-	//}
-
-	//fclose(fp);
+	km.USPLT = VC_G;
 }
 
-void ftime(char *timestr, bool withMS, int ms)
+void ftime(char *timestr, bool withMS, int rms)
 {
-	int seconds   = ms / 1000;
+	int seconds   = rms / 1000;
 	int minutes   = seconds / 60;
 	int hours     = minutes / 60;
 	//A few better formatted variables for displaying these numbers
-	int tms = (ms % 1000) / 10;
+	int tms = (rms % 1000) / 10;
 	int oms = tms / 10;
 	int s   = seconds % 60;
 	int m   = minutes % 60;
@@ -184,27 +155,27 @@ void ftime(char *timestr, bool withMS, int ms)
 
 int timespecToMS(struct timespec t)
 {
-	int ms = t.tv_nsec / 1000000;
-	ms += t.tv_sec * 1000;
-	return ms;
+	int rms = t.tv_nsec / 1000000;
+	rms += t.tv_sec * 1000;
+	return rms;
 }
 
 void drawSegments()
 {
-	char data[(deltasEnabled * 10) + (sgmtdurEnabled * 10) + (pbEnabled * 10) + 11];
+	char data[(deltaOn * 10) + (sgmtdurOn * 10) + (pbOn * 10) + 11];
 	char segmentTime[11];
 	char *zeroStr = "-";
 	char deltaTime[11];
 	char sgmtTime[11];
 	char segTime[11];
-	for(int i = 0; i < segmentCount; i++) {
-		ftime(segmentTime, false, pbrun[i].realtimeMS);
-		if (i >= currentSegment) {
+	for(int i = 0; i < segCount; i++) {
+		ftime(segmentTime, false, pbrun[i].ms);
+		if (i >= currSeg) {
 			sprintf(data, "%10s%10s%10s%10s", zeroStr, zeroStr, zeroStr, segmentTime);
 		} else {
-			ftime(deltaTime, false, segments[i].realtimeMS - pbrun[i].realtimeMS);
-			ftime(sgmtTime, false, segments[i].realtimeMS - segments[i - 1].realtimeMS);
-			ftime(segTime, false, segments[i].realtimeMS);
+			ftime(deltaTime, false, segments[i].ms - pbrun[i].ms);
+			ftime(sgmtTime, false, segments[i].ms - segments[i - 1].ms);
+			ftime(segTime, false, segments[i].ms);
 			sprintf(data, "%10s%10s%10s%10s", deltaTime, sgmtTime, segTime, segmentTime);
 		}
 		rghtPrint(6 + i, w, data);
@@ -214,32 +185,32 @@ void drawSegments()
 
 void drawCurrentSegment()
 {
-	char data[(deltasEnabled * 10) + (sgmtdurEnabled * 10) + (pbEnabled * 10) + 11];
+	char data[(deltaOn * 10) + (sgmtdurOn * 10) + (pbOn * 10) + 11];
 	strcpy(data, "");
 	char pbTime[11];
 	char deltaTime[11];
 	char sgmtTime[11];
 	char segTime[11];
-	if (deltasEnabled) {
-		ftime(deltaTime, false, currentMS - pbrun[currentSegment].realtimeMS);
+	if (deltaOn) {
+		ftime(deltaTime, false, currentMS - pbrun[currSeg].ms);
 		strcat(data, deltaTime);
 	}
-	if (sgmtdurEnabled) {
-		if (currentSegment == 0)
+	if (sgmtdurOn) {
+		if (currSeg == 0)
 			ftime(sgmtTime, false, currentMS);
 		else
-			ftime(sgmtTime, false, currentMS - segments[currentSegment - 1].realtimeMS);
+			ftime(sgmtTime, false, currentMS - segments[currSeg - 1].ms);
 		strcat(data, sgmtTime);
 	}
 	ftime(segTime, false, currentMS);
 	strcat(data, segTime);
-	if (pbEnabled) {
-		ftime(pbTime, true, pbrun[currentSegment].realtimeMS);
+	if (pbOn) {
+		ftime(pbTime, true, pbrun[currSeg].ms);
 		strcat(data, pbTime);
 	}
-	data[(deltasEnabled * 10) + (sgmtdurEnabled * 10) + (pbEnabled * 10) + 11] = '\0';
-	rghtPrint(6 + currentSegment, w, data);
-	leftPrint(6 + currentSegment, w, segments[currentSegment].name);
+	data[(deltaOn * 10) + (sgmtdurOn * 10) + (pbOn * 10) + 11] = '\0';
+	rghtPrint(6 + currSeg, w, data);
+	leftPrint(6 + currSeg, w, segments[currSeg].name);
 }
 
 void drawDisplay()
@@ -260,16 +231,15 @@ void drawDisplay()
 	rghtPrint(4, w, cols);
 	drawHLine(5, w);
 	printf("\033[5;3H[dsph]");
-	//drawSegments();
 	if (timerActive) {
 		drawCurrentSegment();
 		struct timespec delta;
 		sub_timespec(timestart, finish, &delta);
 		currentMS = timespecToMS(delta);
 	}
-	drawHLine(segmentCount + 6, w);
+	drawHLine(segCount + 6, w);
 	ftime(currentTime, true, currentMS);
-	rghtPrint(segmentCount + 7, w, currentTime);
+	rghtPrint(segCount + 7, w, currentTime);
 	fflush(stdout);
 }
 
@@ -288,21 +258,23 @@ void calculatePB()
 {
 	if (attempts == 0)
 		return;
-	int bestMS = INT_MAX;
+	int bestMS      = INT_MAX;
 	int bestAttempt = 0;
 	for (int i = 0; i < attempts; i++) {
+		int run = i * segCount;
 		bool valid = true;
-		for (int j = 0; j < segmentCount; j++) {
-			if (runHistory[(i * segmentCount) + j].isSkipped == true || runHistory[(i * segmentCount) + j].isReset == true)
+		for (int j = 0; j < segCount; j++) {
+			if (pastRuns[run + j].isSkipped == true ||
+					pastRuns[run + j].isReset == true)
 				valid = false;
 		}
-		if (valid && runHistory[(i * segmentCount) + segmentCount - 1].realtimeMS < bestMS) {
+		if (valid && pastRuns[run + segCount - 1].ms < bestMS) {
 			bestAttempt = i;
-			bestMS = runHistory[(i * segmentCount) + segmentCount - 1].realtimeMS;
+			bestMS = pastRuns[run + segCount - 1].ms;
 		}
 	}
-	for (int i = 0; i < segmentCount; i++) {
-		pbrun[i].realtimeMS = runHistory[(bestAttempt * segmentCount) + i].realtimeMS;
+	for (int i = 0; i < segCount; i++) {
+		pbrun[i].ms = pastRuns[(bestAttempt * segCount) + i].ms;
 	}
 }
 
@@ -341,7 +313,7 @@ void loadFile()
 
 	free(buffer);
 
-	cJSON *schema = cJSON_GetObjectItemCaseSensitive(splitfile, "_schemaVersion");
+	cJSON *schema = cJSON_GetItem(splitfile, "_schemaVersion");
 	if (schema) {
 		importSplitsIO(splitfile);
 		return;
@@ -352,42 +324,42 @@ void loadFile()
 	cJSON *atts = NULL;
 	cJSON *segs = NULL;
 	cJSON *runs = NULL;
-	game = cJSON_GetObjectItemCaseSensitive(splitfile, "game");
-	cate = cJSON_GetObjectItemCaseSensitive(splitfile, "category");
-	atts = cJSON_GetObjectItemCaseSensitive(splitfile, "attempts");
-	segs = cJSON_GetObjectItemCaseSensitive(splitfile, "segments");
-	runs = cJSON_GetObjectItemCaseSensitive(splitfile, "history");
+	game = cJSON_GetItem(splitfile, "game");
+	cate = cJSON_GetItem(splitfile, "category");
+	atts = cJSON_GetItem(splitfile, "attempts");
+	segs = cJSON_GetItem(splitfile, "segments");
+	runs = cJSON_GetItem(splitfile, "history");
 	
 	if (game) {
-		cJSON *title = cJSON_GetObjectItemCaseSensitive(game, "name");
+		cJSON *title = cJSON_GetItem(game, "name");
 		if (cJSON_IsString(title) && (title->valuestring != NULL)) {
 			gameTitle = malloc(strlen(title->valuestring));
 			strcpy(gameTitle, title->valuestring);
 		}
 	}
 	if (cate) {
-		cJSON *title = cJSON_GetObjectItemCaseSensitive(cate, "name");
+		cJSON *title = cJSON_GetItem(cate, "name");
 		if (cJSON_IsString(title) && (title->valuestring != NULL)) {
 			categoryTitle = malloc(strlen(title->valuestring));
 			strcpy(categoryTitle, title->valuestring);
 		}
 	}
 	if (atts) {
-		cJSON *total = cJSON_GetObjectItemCaseSensitive(atts, "total");
+		cJSON *total = cJSON_GetItem(atts, "total");
 		if (cJSON_IsNumber(total))
 			attempts = total->valueint;
 	}
 	if (segs) {
-		segmentCount = cJSON_GetArraySize(segs);
-		segments = calloc(segmentCount, sizeof(struct segment));
-		pbrun    = calloc(segmentCount, sizeof(struct segment));
-		wrrun    = calloc(segmentCount, sizeof(struct segment));
-		bestsegs = calloc(segmentCount, sizeof(struct segment));
+		segCount = cJSON_GetArraySize(segs);
+		segments = calloc(segCount, sizeof(struct segment));
+		pbrun    = calloc(segCount, sizeof(struct segment));
+		wrrun    = calloc(segCount, sizeof(struct segment));
+		bestsegs = calloc(segCount, sizeof(struct segment));
 		int it = 0;
 		cJSON *iterator = NULL;
 		cJSON *segname = NULL;
 		cJSON_ArrayForEach(iterator, segs) {
-			segname = cJSON_GetObjectItemCaseSensitive(iterator, "name");
+			segname = cJSON_GetItem(iterator, "name");
 			if (cJSON_IsString(segname) && (segname->valuestring != NULL)) {
 				segments[it].name = malloc(strlen(segname->valuestring));
 				strcpy(segments[it].name, segname->valuestring);
@@ -397,7 +369,7 @@ void loadFile()
 		
 	}
 	if (runs) {
-		runHistory = calloc(cJSON_GetArraySize(runs) * segmentCount, sizeof(struct pastseg));
+		pastRuns = calloc(cJSON_GetArraySize(runs) * segCount, sizeof(struct pastseg));
 		int oI = 0;
 		cJSON *oIterator = NULL;
 		cJSON_ArrayForEach(oIterator, runs) {
@@ -406,11 +378,11 @@ void loadFile()
 			cJSON_ArrayForEach(iIterator, oIterator) {
 				struct pastseg t;
 				
-				cJSON *ms = cJSON_GetObjectItemCaseSensitive(iIterator, "ms");
-				cJSON *skp = cJSON_GetObjectItemCaseSensitive(iIterator, "skipped");
-				cJSON *rst = cJSON_GetObjectItemCaseSensitive(iIterator, "reset");
+				cJSON *rms = cJSON_GetItem(iIterator, "rms");
+				cJSON *skp = cJSON_GetItem(iIterator, "skipped");
+				cJSON *rst = cJSON_GetItem(iIterator, "reset");
 
-				t.realtimeMS = ms->valueint;
+				t.ms = rms->valueint;
 				if (cJSON_IsTrue(skp))
 					t.isSkipped = true;
 				else
@@ -420,7 +392,7 @@ void loadFile()
 				else
 					t.isReset = false;
 
-				runHistory[(oI * segmentCount) + iI] = t;
+				pastRuns[(oI * segCount) + iI] = t;
 				iI++;
 			}
 			oI++;
@@ -436,37 +408,37 @@ void importSplitsIO(cJSON *splitfile)
 	cJSON *game = NULL;
 	cJSON *cate = NULL;
 	cJSON *segs = NULL;
-	game = cJSON_GetObjectItemCaseSensitive(splitfile, "game");
-	cate = cJSON_GetObjectItemCaseSensitive(splitfile, "category");
-	segs = cJSON_GetObjectItemCaseSensitive(splitfile, "segments");
+	game = cJSON_GetItem(splitfile, "game");
+	cate = cJSON_GetItem(splitfile, "category");
+	segs = cJSON_GetItem(splitfile, "segments");
 
 	if (game) {
-		cJSON *title = cJSON_GetObjectItemCaseSensitive(game, "longname");
+		cJSON *title = cJSON_GetItem(game, "longname");
 		if (cJSON_IsString(title) && (title->valuestring != NULL)) {
 			gameTitle = malloc(strlen(title->valuestring));
 			strcpy(gameTitle, title->valuestring);
 		}
 	}
 	if (cate) {
-		cJSON *title = cJSON_GetObjectItemCaseSensitive(cate, "longname");
+		cJSON *title = cJSON_GetItem(cate, "longname");
 		if (cJSON_IsString(title) && (title->valuestring != NULL)) {
 			categoryTitle = malloc(strlen(title->valuestring));
 			strcpy(categoryTitle, title->valuestring);
 		}
 	}
 	if (segs) {
-		segmentCount = cJSON_GetArraySize(segs);
-		segments = calloc(segmentCount, sizeof(struct segment));
-		pbrun    = calloc(segmentCount, sizeof(struct segment));
-		wrrun    = calloc(segmentCount, sizeof(struct segment));
-		bestsegs = calloc(segmentCount, sizeof(struct segment));
+		segCount = cJSON_GetArraySize(segs);
+		segments = calloc(segCount, sizeof(struct segment));
+		pbrun    = calloc(segCount, sizeof(struct segment));
+		wrrun    = calloc(segCount, sizeof(struct segment));
+		bestsegs = calloc(segCount, sizeof(struct segment));
 
 		cJSON *segname  = NULL;
 
 		int it = 0;
 		cJSON *iterator = NULL;
 		cJSON_ArrayForEach(iterator, segs) {
-			segname = cJSON_GetObjectItemCaseSensitive(iterator, "name");
+			segname = cJSON_GetItem(iterator, "name");
 			if (cJSON_IsString(segname) && (segname->valuestring != NULL)) {
 				segments[it].name = malloc(strlen(segname->valuestring));
 				strcpy(segments[it].name, segname->valuestring);
@@ -477,8 +449,6 @@ void importSplitsIO(cJSON *splitfile)
 	cJSON_Delete(splitfile);
 }
 
-//TODO: This function should check to see if the timer is currently running,
-//because it runs when the program closes and the run might still be in progress
 void saveFile()
 {
 	if (timerActive)
@@ -504,7 +474,7 @@ void saveFile()
 	cJSON_AddItemToObject(splitfile, "category", cate);
 	cJSON_AddItemToObject(splitfile, "attempts", atts);
 
-	for(int i = 0; i < segmentCount; i++) {
+	for(int i = 0; i < segCount; i++) {
 		cJSON *seg  = cJSON_CreateObject();
 		cJSON *segn = cJSON_CreateString(segments[i].name);
 		cJSON_AddItemToObject(seg, "name", segn);
@@ -514,15 +484,15 @@ void saveFile()
 
 	for (int i = 0; i < attempts; i++) {
 		cJSON *run = cJSON_CreateArray();
-		for (int j = 0; j < segmentCount; j++) {
-			struct pastseg t = runHistory[(i * segmentCount) + j];
+		for (int j = 0; j < segCount; j++) {
+			struct pastseg t = pastRuns[(i * segCount) + j];
 			cJSON *seg = cJSON_CreateObject();
 
-			cJSON *tim = cJSON_CreateNumber(t.realtimeMS);
+			cJSON *tim = cJSON_CreateNumber(t.ms);
 			cJSON *skp = cJSON_CreateBool(t.isSkipped);
 			cJSON *rst = cJSON_CreateBool(t.isReset);
 
-			cJSON_AddItemToObject(seg, "ms", tim);
+			cJSON_AddItemToObject(seg, "rms", tim);
 			cJSON_AddItemToObject(seg, "skipped", skp);
 			cJSON_AddItemToObject(seg, "reset", rst);
 
@@ -568,8 +538,6 @@ int main(int argc, char **argv)
 		close(pipefd[1]);
 		signal(SIGWINCH, resize);
 		resize(0);
-		struct color bg = { 47,  53,  66};
-		struct color fg = {247, 248, 242};
 		initScreen(bg, fg);
 		loadFile();
 		while(!handleInput()) {

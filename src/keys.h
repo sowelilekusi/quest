@@ -11,6 +11,7 @@
 #define K_SPLIT 4
 #define K_CLOSE 5
 #define K_HOTKS 6
+#define K_USPLT 7
 
 struct keymap
 {
@@ -20,6 +21,7 @@ struct keymap
 	uint16_t SPLIT;
 	uint16_t CLOSE;
 	uint16_t HOTKS;
+	uint16_t USPLT;
 };
 
 extern char buf;

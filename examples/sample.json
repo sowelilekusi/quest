@@ -1,0 +1,17 @@
+{
+	"game":	{
+		"name":	"Game Name"
+	},
+	"category":	{
+		"name":	"Catagory Name"
+	},
+	"segments":	[{
+			"name":	"First Split"
+		}, {
+			"name":	"Second Split"
+		}, {
+			"name":	"Third Split"
+		}, {
+			"name":	"Last Split"
+		}]
+}
