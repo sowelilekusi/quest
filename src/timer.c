@@ -50,15 +50,6 @@ void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td)
 	}
 }
 
-void reset()
-{
-	if (!timerActive)
-		return;
-	segments[currSeg].isReset = true;
-	stop();
-	currSeg = -1;
-}
-
 void start()
 {
 	if (timerActive || segCount == 0)
@@ -73,6 +64,8 @@ void stop()
 {
 	if (!timerActive)
 		return;
+	if (currSeg < segCount)
+		segments[currSeg].isReset = true;
 	timerActive = false;
 	attempts++;
 	if (pastRuns)
@@ -88,6 +81,14 @@ void stop()
 	}
 	calculatePB();
 	saveFile();
+
+	//Reset state of timer
+	for(int i = 0; i < segCount; i++) {
+		segments[i].ms        = 0;
+		segments[i].isSkipped = false;
+		segments[i].isReset   = false;
+	}
+	currSeg = 0;
 }
 
 void split()
@@ -112,6 +113,16 @@ void tpause()
 
 }
 
+void skip()
+{
+	if (!timerActive)
+		return;
+	segments[currSeg].isSkipped = true;
+	currSeg++;
+	if (currSeg >= segCount)
+		stop();
+}
+
 void loadKeymap()
 {
 	km.START = VC_R;
@@ -121,6 +132,7 @@ void loadKeymap()
 	km.CLOSE = VC_C;
 	km.HOTKS = VC_T;
 	km.USPLT = VC_G;
+	km.SKIP  = VC_V;
 }
 
 void ftime(char *timestr, bool withMS, int rms)
@@ -176,7 +188,10 @@ void drawSegments()
 			ftime(deltaTime, false, segments[i].ms - pbrun[i].ms);
 			ftime(sgmtTime, false, segments[i].ms - segments[i - 1].ms);
 			ftime(segTime, false, segments[i].ms);
-			sprintf(data, "%10s%10s%10s%10s", deltaTime, sgmtTime, segTime, segmentTime);
+			if (segments[i].isSkipped)
+				sprintf(data, "%10s%10s%10s%10s", zeroStr, zeroStr, zeroStr, segmentTime);
+			else
+				sprintf(data, "%10s%10s%10s%10s", deltaTime, sgmtTime, segTime, segmentTime);
 		}
 		rghtPrint(6 + i, w, data);
 		leftPrint(6 + i, w, segments[i].name);
@@ -232,6 +247,7 @@ void drawDisplay()
 	drawHLine(5, w);
 	printf("\033[5;3H[dsph]");
 	if (timerActive) {
+		drawSegments();
 		drawCurrentSegment();
 		struct timespec delta;
 		sub_timespec(timestart, finish, &delta);
@@ -254,6 +270,9 @@ void resize(int i)
 	resized = true;
 }
 
+//This function will find an invalid run if theres only one in the history
+//and that run is invalid. Also, runs with skipped segments aren't considered
+//valid but should be
 void calculatePB()
 {
 	if (attempts == 0)

@@ -20,9 +20,10 @@ splits after the first use of the split file is currently unsupported.
 | Keys | Action                |
 | ---- | --------------------- |
 | `R`  | Start                 |
-| `F`  | Stop                  |
+| `F`  | Stop / Reset          |
 | `E`  | Split                 |
 | `G`  | Undo split            |
+| `V`  | Skip split            |
 | `C`  | Close                 |
 | `T`  | Toggle global hotkeys |
 

@@ -43,7 +43,7 @@ void stop();
 void split();
 void tpause();
 void unsplit();
-void reset();
+void skip();
 void loadKeymap();
 void ftime(char *timestr, bool withMS, int ms);
 int timespecToMS(struct timespec t);
