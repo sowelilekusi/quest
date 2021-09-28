@@ -18,7 +18,7 @@
 #include <math.h>
 #include "cJSON.h"
 
-#define NS_PER_S 1000000000
+#define NS_PER_S  1000000000
 #define cJSON_GetItem(x, y) cJSON_GetObjectItemCaseSensitive(x, y)
 
 struct segment
@@ -47,8 +47,11 @@ void skip();
 void loadKeymap();
 void ftime(char *timestr, bool withMS, int ms);
 int timespecToMS(struct timespec t);
-void drawSegments();
-void drawCurrentSegment();
+void drawNotif();
+void clearNotif();
+void drawSegmentNames();
+void drawTimeColumn();
+void toggleCompact();
 void drawDisplay();
 void resize(int i);
 void importSplitsIO(cJSON *splitfile);

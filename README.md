@@ -17,14 +17,15 @@ the names of your game, catagories and splits. Changing split names/number of
 splits after the first use of the split file is currently unsupported.
 
 ### Default Keybinds
-| Keys | Action                |
-| ---- | --------------------- |
-| `R`  | Start                 |
-| `F`  | Stop / Reset          |
-| `E`  | Split                 |
-| `G`  | Undo split            |
-| `V`  | Skip split            |
-| `C`  | Close                 |
-| `T`  | Toggle global hotkeys |
+| Keys | Action                | Global |
+| ---- | --------------------- | ------ |
+| `R`  | Start                 | YES    |
+| `F`  | Stop / Reset          | YES    |
+| `E`  | Split                 | YES    |
+| `G`  | Undo split            | YES    |
+| `V`  | Skip split            | YES    |
+| `Q`  | Close                 | NO     |
+| `T`  | Toggle global hotkeys | YES    |
+| `C`  | Toggle compact UI     | NO     |
 
 Customisable hotkeys without editing the source code coming soon!

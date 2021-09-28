@@ -5,6 +5,8 @@
 #include <string.h>
 #include <termios.h>
 #include <limits.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 extern const char *millitime;
 extern const char *secondstime;
@@ -15,6 +17,7 @@ extern const char *sfulltime;
 extern int maxrows;
 extern int maxcols;
 extern int colwidth;
+extern int in;
 
 struct color {
 	int r;

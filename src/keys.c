@@ -21,8 +21,6 @@ void dispatch_proc(uiohook_event * const event) {
 				buf = K_PAUSE;
 			if (event->data.keyboard.keycode == km.SPLIT)
 				buf = K_SPLIT;
-			if (event->data.keyboard.keycode == km.CLOSE)
-				buf = K_CLOSE;
 			if (event->data.keyboard.keycode == km.HOTKS)
 				buf = K_HOTKS;
 			if (event->data.keyboard.keycode == km.USPLT)
@@ -38,6 +36,8 @@ void dispatch_proc(uiohook_event * const event) {
 int handleInput()
 {
 	ssize_t rd = read(pipefd[0], &buf, 1);
+	char t;
+	read(in, &t, 1);
 	if ((!hotkeys_enabled && buf != K_HOTKS) || rd == -1)
 		return 0;
 	if (buf == K_SPLIT)
@@ -48,13 +48,20 @@ int handleInput()
 		stop();
 	if (buf == K_PAUSE)
 		tpause();
-	if (buf == K_HOTKS)
+	if (buf == K_HOTKS) {
 		hotkeys_enabled = !hotkeys_enabled;
+		if (hotkeys_enabled)
+			drawNotif("Global hotkeys enabled");
+		else
+			drawNotif("Global hotkeys disabled");
+	}
 	if (buf == K_USPLT)
 		unsplit();
 	if (buf == K_SKIP)
 		skip();
-	if (buf == K_CLOSE)
+	if (t == 'c')
+		toggleCompact();
+	if (t == 'q')
 		return 1;
 	return 0;
 }

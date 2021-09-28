@@ -4,15 +4,17 @@
 #include <uiohook.h>
 #include <unistd.h>
 #include "timer.h"
+#include "display.h"
 
 #define K_START 1
 #define K_STOP  2
 #define K_PAUSE 3
 #define K_SPLIT 4
-#define K_CLOSE 5
-#define K_HOTKS 6
-#define K_USPLT 7
-#define K_SKIP  8
+#define K_HOTKS 5
+#define K_USPLT 6
+#define K_SKIP  7
+
+extern bool hotkeys_enabled;
 
 struct keymap
 {
@@ -20,7 +22,6 @@ struct keymap
 	uint16_t STOP;
 	uint16_t PAUSE;
 	uint16_t SPLIT;
-	uint16_t CLOSE;
 	uint16_t HOTKS;
 	uint16_t USPLT;
 	uint16_t SKIP;

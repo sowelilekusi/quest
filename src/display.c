@@ -10,6 +10,7 @@ const char *sfulltime   = "%4d:%02d.%02d";
 int maxrows = INT_MAX;
 int maxcols = INT_MAX;
 int colwidth = 10;
+int in = 0;
 
 struct termios base;
 
@@ -55,6 +56,8 @@ void initScreen(struct color bg, struct color fg)
 	t = base;
 	t.c_lflag &= (~ECHO & ~ICANON);
 	tcsetattr(1, TCSANOW, &t);
+	dup(0);
+	fcntl(0, F_SETFL, O_NONBLOCK);
 	altBuffer();
 	setBGColor(bg);
 	setFGColor(fg);
@@ -99,9 +102,9 @@ void drawHLine(int row, int maxlen)
 //from the right hand side towards the left.
 void drawColumn(char **data, int count, int column)
 {
-	int x = maxcols - (column * 10);
+	int x = maxcols - (column * 10) + 1;
 	int y = 6;
-	if (column == 1)
+	if (column == 0)
 		x = 1;
 	for (int i = 0; i < count; i++) {
 		printf(MVCUR, y + i, x, data[i]);

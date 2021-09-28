@@ -1,7 +1,7 @@
 #include "timer.h"
 
 //Timekeeping
-struct timespec timestart, finish;
+struct timespec timestart, finish, notif;
 int currentMS = 0;
 bool timerActive;
 
@@ -9,10 +9,8 @@ bool timerActive;
 struct color bg = { 47,  53,  66};
 struct color fg = {247, 248, 242};
 int h, w;
-int deltaOn     = 1;
-int sgmtdurOn   = 1;
-int pbOn        = 1;
-bool resized    = false;
+bool compact = false;
+bool dirty   = false;
 
 //Splits.io data
 const char *schemaver  = "v1.0.1";
@@ -56,7 +54,12 @@ void start()
 		return;
 	clock_gettime(CLOCK_REALTIME, &timestart);
 	timerActive    = true;
-	resized        = true;
+	//Reset state of timer
+	for(int i = 0; i < segCount; i++) {
+		segments[i].ms        = 0;
+		segments[i].isSkipped = false;
+		segments[i].isReset   = false;
+	}
 	currSeg = 0;
 }
 
@@ -81,14 +84,6 @@ void stop()
 	}
 	calculatePB();
 	saveFile();
-
-	//Reset state of timer
-	for(int i = 0; i < segCount; i++) {
-		segments[i].ms        = 0;
-		segments[i].isSkipped = false;
-		segments[i].isReset   = false;
-	}
-	currSeg = 0;
 }
 
 void split()
@@ -117,7 +112,8 @@ void skip()
 {
 	if (!timerActive)
 		return;
-	segments[currSeg].isSkipped = true;
+	if (currSeg < segCount)
+		segments[currSeg].isSkipped = true;
 	currSeg++;
 	if (currSeg >= segCount)
 		stop();
@@ -129,7 +125,6 @@ void loadKeymap()
 	km.STOP  = VC_F;
 	km.PAUSE = VC_D;
 	km.SPLIT = VC_E;
-	km.CLOSE = VC_C;
 	km.HOTKS = VC_T;
 	km.USPLT = VC_G;
 	km.SKIP  = VC_V;
@@ -167,91 +162,121 @@ void ftime(char *timestr, bool withMS, int rms)
 
 int timespecToMS(struct timespec t)
 {
-	int rms = t.tv_nsec / 1000000;
-	rms += t.tv_sec * 1000;
-	return rms;
+	return (t.tv_nsec / 1000000) + (t.tv_sec * 1000);
 }
 
-void drawSegments()
+void drawSegmentNames()
 {
-	char data[(deltaOn * 10) + (sgmtdurOn * 10) + (pbOn * 10) + 11];
-	char segmentTime[11];
-	char *zeroStr = "-";
-	char deltaTime[11];
-	char sgmtTime[11];
-	char segTime[11];
+	char *names[segCount];
 	for(int i = 0; i < segCount; i++) {
-		ftime(segmentTime, false, pbrun[i].ms);
-		if (i >= currSeg) {
-			sprintf(data, "%10s%10s%10s%10s", zeroStr, zeroStr, zeroStr, segmentTime);
-		} else {
-			ftime(deltaTime, false, segments[i].ms - pbrun[i].ms);
-			ftime(sgmtTime, false, segments[i].ms - segments[i - 1].ms);
-			ftime(segTime, false, segments[i].ms);
-			if (segments[i].isSkipped)
-				sprintf(data, "%10s%10s%10s%10s", zeroStr, zeroStr, zeroStr, segmentTime);
+		names[i] = segments[i].name;
+	}
+	drawColumn(names, segCount, 0);
+}
+
+//TODO: try to clean the branching up
+void drawTimeColumn(int timeoption, int column)
+{
+	char *times[segCount];
+	for (int i = 0; i < segCount; i++) {
+		times[i] = calloc(1, 11);
+		int time = 0;
+		switch (timeoption) {
+		case 0:
+			time = pbrun[i].ms;
+			break;
+		case 1:
+			if (i == currSeg)
+				time = currentMS - pbrun[i].ms;
 			else
-				sprintf(data, "%10s%10s%10s%10s", deltaTime, sgmtTime, segTime, segmentTime);
+				time = segments[i].ms - pbrun[i].ms;
+			break;
+		case 2:
+			if (i > 0 && i < currSeg)
+				time = segments[i].ms - segments[i - 1].ms;
+			else if (i > 0 && i == currSeg)
+				time = currentMS - segments[i - 1].ms;
+			else if (i == 0 && i == currSeg)
+				time = currentMS;
+			else
+				time = segments[i].ms;
+			break;
+		case 3:
+			if (i == currSeg)
+				time = currentMS;
+			else
+				time = segments[i].ms;
 		}
-		rghtPrint(6 + i, w, data);
-		leftPrint(6 + i, w, segments[i].name);
+		ftime(times[i], false, time);
+	}
+	drawColumn(times, segCount, column);
+	for (int i = 0; i < segCount; i++) {
+		free(times[i]);
 	}
 }
 
-void drawCurrentSegment()
+void drawNotif(char* text)
 {
-	char data[(deltaOn * 10) + (sgmtdurOn * 10) + (pbOn * 10) + 11];
-	strcpy(data, "");
-	char pbTime[11];
-	char deltaTime[11];
-	char sgmtTime[11];
-	char segTime[11];
-	if (deltaOn) {
-		ftime(deltaTime, false, currentMS - pbrun[currSeg].ms);
-		strcat(data, deltaTime);
-	}
-	if (sgmtdurOn) {
-		if (currSeg == 0)
-			ftime(sgmtTime, false, currentMS);
-		else
-			ftime(sgmtTime, false, currentMS - segments[currSeg - 1].ms);
-		strcat(data, sgmtTime);
-	}
-	ftime(segTime, false, currentMS);
-	strcat(data, segTime);
-	if (pbOn) {
-		ftime(pbTime, true, pbrun[currSeg].ms);
-		strcat(data, pbTime);
-	}
-	data[(deltaOn * 10) + (sgmtdurOn * 10) + (pbOn * 10) + 11] = '\0';
-	rghtPrint(6 + currSeg, w, data);
-	leftPrint(6 + currSeg, w, segments[currSeg].name);
+	clock_gettime(CLOCK_REALTIME, &notif);
+	clearNotif();
+	leftPrint(maxrows, w, text);
+}
+
+void clearNotif()
+{
+	leftPrint(maxrows, w, "\033[2K");
+}
+
+void toggleCompact()
+{
+	compact = !compact;
+	//Clears the screen rather than dirtying it so the notif doesnt clear
+	clrScreen();
+	if (compact)
+		drawNotif("Compact mode enabled");
+	else
+		drawNotif("Compact mode disabled");
 }
 
 void drawDisplay()
 {
-	if (resized) {
+	if (dirty) {
 		clrScreen();
-		drawSegments();
-		resized = false;
+		dirty = false;
 	}
 	rghtPrint(1, w, "Attempts");
 	char atmpt[10];
 	sprintf(atmpt, "%9d", attempts);
 	rghtPrint(2, w, atmpt);
 	cntrPrint(1, w / 2, w, gameTitle);
-	cntrPrint(2, w / 2, w, categoryTitle);
-	char cols[41];
-	sprintf(cols, "%10s%10s%10s%10s", "Delta", "Sgmt", "Time", "PB");
-	rghtPrint(4, w, cols);
+	cntrPrint(2, w / 2, w, categoryTitle);	
 	drawHLine(5, w);
-	printf("\033[5;3H[dsph]");
-	if (timerActive) {
-		drawSegments();
-		drawCurrentSegment();
-		struct timespec delta;
-		sub_timespec(timestart, finish, &delta);
-		currentMS = timespecToMS(delta);
+	printf("\033[5;3H");
+	if (hotkeys_enabled || compact)
+		printf("[");
+	if (hotkeys_enabled)
+		printf("h");
+	if (compact)
+		printf("c");
+	if (hotkeys_enabled || compact)
+		printf("]");
+	drawSegmentNames();
+	//TODO: The column names stuff has to be more dynamic, part of the
+	//drawColumn function probably
+	if (!compact) {
+		char cols[41];
+		sprintf(cols, "%10s%10s%10s%10s", "Delta", "Sgmt", "Time", "PB");
+		rghtPrint(4, w, cols);
+		drawTimeColumn(0, 1);
+		drawTimeColumn(3, 2);
+		drawTimeColumn(2, 3);
+		drawTimeColumn(1, 4);
+	} else {
+		char cols[21];
+		sprintf(cols, "%10s%10s", "Delta", "Time/PB");
+		rghtPrint(4, w, cols);
+		drawTimeColumn(3, 1);
+		drawTimeColumn(1, 2);
 	}
 	drawHLine(segCount + 6, w);
 	ftime(currentTime, true, currentMS);
@@ -267,24 +292,22 @@ void resize(int i)
 	h = ws.ws_row;
 	setMaxCols(w);
 	setMaxRows(h);
-	resized = true;
+	dirty = true;
 }
 
-//This function will find an invalid run if theres only one in the history
-//and that run is invalid. Also, runs with skipped segments aren't considered
-//valid but should be
 void calculatePB()
 {
-	if (attempts == 0)
-		return;
+	bool valid      = false;
 	int bestMS      = INT_MAX;
 	int bestAttempt = 0;
+
+	if (attempts == 0)
+		return;
 	for (int i = 0; i < attempts; i++) {
 		int run = i * segCount;
-		bool valid = true;
+		valid = true;
 		for (int j = 0; j < segCount; j++) {
-			if (pastRuns[run + j].isSkipped == true ||
-					pastRuns[run + j].isReset == true)
+			if (pastRuns[run + j].isReset == true)
 				valid = false;
 		}
 		if (valid && pastRuns[run + segCount - 1].ms < bestMS) {
@@ -292,8 +315,23 @@ void calculatePB()
 			bestMS = pastRuns[run + segCount - 1].ms;
 		}
 	}
+	if (valid)
+		for (int i = 0; i < segCount; i++)
+			pbrun[i].ms = pastRuns[(bestAttempt * segCount) + i].ms;
+}
+
+void calculateBestSegs()
+{
+	if (attempts == 0)
+		return;
 	for (int i = 0; i < segCount; i++) {
-		pbrun[i].ms = pastRuns[(bestAttempt * segCount) + i].ms;
+		int bms = INT_MAX;
+		for (int j = 0; j < attempts; j++) {
+			int cms = pastRuns[(j * segCount) + i].ms;
+			if (cms != 0 && cms < bms)
+				bms = cms;
+		}
+		bestsegs[i].ms = bms;
 	}
 }
 
@@ -419,6 +457,7 @@ void loadFile()
 	}
 	cJSON_Delete(splitfile);
 	calculatePB();
+	calculateBestSegs();
 }
 
 //Imports game/catagory names and segment names
@@ -560,10 +599,16 @@ int main(int argc, char **argv)
 		initScreen(bg, fg);
 		loadFile();
 		while(!handleInput()) {
-			drawDisplay();
+			struct timespec delta;
+			clock_gettime(CLOCK_REALTIME, &finish);
+			sub_timespec(notif, finish, &delta);
+			if (delta.tv_sec == 3)
+				clearNotif();
 			if (timerActive) {
-				clock_gettime(CLOCK_REALTIME, &finish);
+				sub_timespec(timestart, finish, &delta);
+				currentMS = timespecToMS(delta);
 			}
+			drawDisplay();
 			usleep(4000);
 		}
 		resetScreen();
