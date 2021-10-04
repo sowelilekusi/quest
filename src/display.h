@@ -8,12 +8,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-extern const char *millitime;
-extern const char *secondstime;
-extern const char *minutestime;
-extern const char *hourstime;
-extern const char *fulltime;
-extern const char *sfulltime;
 extern int maxrows;
 extern int maxcols;
 extern int colwidth;
@@ -38,9 +32,9 @@ void cntrPrint(int row, int col, int maxlen, char *text);
 void leftPrint(int row, int maxlen, char *text);
 void rghtPrint(int row, int maxlem, char *text);
 void drawHLine(int row, int maxlen);
-void drawColumn(char **data, int count, int column);
+void drawColumn(char **data, int count, int column, int end);
 void drawRow(char **data, int count, int row);
-void drawCell(char *data, int column, int row);
+void drawCell(char *data, int column, int row, struct color col);
 void setMaxRows(int rows);
 void setMaxCols(int cols);
 

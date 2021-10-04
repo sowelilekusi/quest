@@ -35,9 +35,16 @@ void dispatch_proc(uiohook_event * const event) {
 
 int handleInput()
 {
-	ssize_t rd = read(pipefd[0], &buf, 1);
+	//Non global hotkeys	
 	char t;
 	read(in, &t, 1);
+	if (t == 'c')
+		toggleCompact();
+	if (t == 'q')
+		return 1;
+
+	//Global hotkeys
+	ssize_t rd = read(pipefd[0], &buf, 1);
 	if ((!hotkeys_enabled && buf != K_HOTKS) || rd == -1)
 		return 0;
 	if (buf == K_SPLIT)
@@ -59,9 +66,5 @@ int handleInput()
 		unsplit();
 	if (buf == K_SKIP)
 		skip();
-	if (t == 'c')
-		toggleCompact();
-	if (t == 'q')
-		return 1;
 	return 0;
 }

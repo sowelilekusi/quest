@@ -13,7 +13,7 @@ A speedrun timer for \*nix terminals
 ## Usage
 
 Copy `examples/sample.json` somewhere, replace the sample information with
-the names of your game, catagories and splits. Changing split names/number of
+the names of your game, catagories and splits. Changing the number of
 splits after the first use of the split file is currently unsupported.
 
 ### Default Keybinds

@@ -45,7 +45,7 @@ void tpause();
 void unsplit();
 void skip();
 void loadKeymap();
-void ftime(char *timestr, bool withMS, int ms);
+void ftime(char *timestr, int rms, int decimals, bool sign);
 int timespecToMS(struct timespec t);
 void drawNotif();
 void clearNotif();

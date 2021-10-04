@@ -3,7 +3,7 @@ LIBS   = -lm -luiohook
 CC     = gcc
 CFLAGS = -g -Wall
 INSTALL_PATH = /usr/local
-VERSION = 0.5.0
+VERSION = 0.5.1
 
 .PHONY: default all clean
 

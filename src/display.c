@@ -1,11 +1,5 @@
 #include "display.h"
 
-const char *millitime   = "%8d.%d";
-const char *secondstime = "%7d.%02d";
-const char *minutestime = "%7d:%02d";
-const char *hourstime   = "%5d:%02d:%02d";
-const char *fulltime    = "%2d:%02d:%02d.%02d";
-const char *sfulltime   = "%4d:%02d.%02d";
 #define MVCUR "\033[%d;%dH%s"
 int maxrows = INT_MAX;
 int maxcols = INT_MAX;
@@ -100,14 +94,15 @@ void drawHLine(int row, int maxlen)
 
 //Column 0 is the left justified column, all following columns columns count
 //from the right hand side towards the left.
-void drawColumn(char **data, int count, int column)
+void drawColumn(char **data, int count, int column, int end)
 {
 	int x = maxcols - (column * 10) + 1;
 	int y = 6;
 	if (column == 0)
 		x = 1;
 	for (int i = 0; i < count; i++) {
-		printf(MVCUR, y + i, x, data[i]);
+		if (i <= end)
+			printf(MVCUR, y + i, x, data[i]);
 	}
 }
 
@@ -122,12 +117,13 @@ void drawRow(char **data, int count, int row)
 	}
 }
 
-void drawCell(char *data, int column, int row)
+//In case you need colors, you gotta draw cell by cell
+void drawCell(char *data, int column, int row, struct color col)
 {
-	int x = maxcols - (column * 10);
+	int x = maxcols - (column * 10) + 1;
 	if (column == 1)
 		x = 1;
-	printf(MVCUR, row, x, data);
+	printf("\033[38;2;%d;%d;%dm\033[%d;%dH%s", col.r, col.g, col.b, row, x, data);
 }
 
 void setMaxRows(int rows)

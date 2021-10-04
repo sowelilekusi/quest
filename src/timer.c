@@ -1,13 +1,20 @@
 #include "timer.h"
 
+#define COLSTRLEN 11
+
 //Timekeeping
 struct timespec timestart, finish, notif;
 int currentMS = 0;
+int timeSave  = 0;
 bool timerActive;
 
 //UI
-struct color bg = { 47,  53,  66};
-struct color fg = {247, 248, 242};
+struct color bg   = { 47,  53,  66};
+struct color fg   = {247, 248, 242};
+struct color fade = {210, 210, 210};
+struct color gold = {249, 255,  79};
+struct color good = { 79, 255,  85};
+struct color bad  = {255,  79,  79};
 int h, w;
 bool compact = false;
 bool dirty   = false;
@@ -16,7 +23,7 @@ bool dirty   = false;
 const char *schemaver  = "v1.0.1";
 const char *timersname = "quest";
 const char *timerlname = "Quinn's Utterly Elegant Speedrun Timer";
-const char *timerver   = "v0.5.0";
+const char *timerver   = "v0.5.1";
 const char *timerlink  = "https://github.com/SilentFungus/quest";
 
 //Run data
@@ -55,6 +62,7 @@ void start()
 	clock_gettime(CLOCK_REALTIME, &timestart);
 	timerActive    = true;
 	//Reset state of timer
+	dirty = true;
 	for(int i = 0; i < segCount; i++) {
 		segments[i].ms        = 0;
 		segments[i].isSkipped = false;
@@ -130,33 +138,103 @@ void loadKeymap()
 	km.SKIP  = VC_V;
 }
 
-void ftime(char *timestr, bool withMS, int rms)
+void ftime(char *timestr, int rms, int decimals, bool sign)
 {
+	if (decimals > 3 || decimals < 0)
+		decimals = 0;
 	int seconds   = rms / 1000;
 	int minutes   = seconds / 60;
 	int hours     = minutes / 60;
 	//A few better formatted variables for displaying these numbers
-	int tms = (rms % 1000) / 10;
-	int oms = tms / 10;
+	int thr = rms % 1000;
+	int two = thr / 10;
+	int one = two / 10;
 	int s   = seconds % 60;
 	int m   = minutes % 60;
 	int h   = hours;
+	int d   = 0;
+	switch (decimals) {
+	case 1:
+		d = one;
+		break;
+	case 2:
+		d = two;
+		break;
+	case 3:
+		d = thr;
+		break;
+	}
+
+	char tformat[22];
+	int i = 0;
+	int decimalspace = decimals + (decimals != 0);
+	if (hours) {
+		tformat[i++] = '%';
+		if (sign)
+			tformat[i++] = '+';
+		tformat[i++] = (colwidth - 6 - decimalspace) + 48;
+		tformat[i++] = 'd';
+		tformat[i++] = ':';
+	}
+	if (minutes) {
+		tformat[i++] = '%';
+		if (sign && !hours)
+			tformat[i++] = '+';
+		if (hours) {
+			tformat[i++] = '0';
+			tformat[i++] = '2';
+		} else {
+			tformat[i++] = (colwidth - 3 - decimalspace) + 48;
+		}
+		tformat[i++] = 'd';
+		tformat[i++] = ':';
+	}
+
+	tformat[i++] = '%';
+	if (s != 0 && sign && !hours && !minutes)
+		tformat[i++] = '+';
+	if (minutes) {
+		tformat[i++] = '0';
+		tformat[i++] = '2';
+	} else {
+		//This value can push the resulting char out of the numbers
+		//section of the ascii table so we gotta clamp it
+		int n = colwidth - decimalspace + 48;
+		if (n >= 58)
+			n = 57;
+		tformat[i++] = n;
+	}
+	tformat[i++] = 'd';
+
+	if (decimals) {
+		tformat[i++] = '.';
+		tformat[i++] = '%';
+		tformat[i++] = '0';
+		tformat[i++] = decimals + 48;
+		tformat[i++] = 'd';
+	}
+	tformat[i] = 0;
 
 	if (hours) {
-		if (withMS)
-			sprintf(timestr, fulltime, h, abs(h), abs(m), abs(s), abs(tms));
+		if (!decimals)
+			sprintf(timestr, tformat, h, abs(m), abs(s));
 		else
-			sprintf(timestr, hourstime, h, abs(m), abs(s));
+			sprintf(timestr, tformat, h, abs(m), abs(s), abs(d));
 	} else if (minutes) {
-		if (withMS)
-			sprintf(timestr, sfulltime, m, abs(s), abs(tms));
+		if (!decimals)
+			sprintf(timestr, tformat, m, abs(s));
 		else
-			sprintf(timestr, minutestime, m, abs(s));
+			sprintf(timestr, tformat, m, abs(s), abs(d));
 	} else {
-		if (withMS)
-			sprintf(timestr, secondstime, s, abs(tms));
-		else
-			sprintf(timestr, millitime, s, abs(oms));
+		if (!decimals) {
+			sprintf(timestr, tformat, s);
+		} else {
+			sprintf(timestr, tformat, s, abs(d));
+			if (sign && s == 0 && d < 0)
+				timestr[COLSTRLEN - 4 - decimals] = '-';
+			if (sign && s == 0 && d >= 0)
+				timestr[COLSTRLEN - 4 - decimals] = '+';
+		}
 	}
 }
 
@@ -171,25 +249,56 @@ void drawSegmentNames()
 	for(int i = 0; i < segCount; i++) {
 		names[i] = segments[i].name;
 	}
-	drawColumn(names, segCount, 0);
+	drawColumn(names, segCount, 0, segCount);
+}
+
+//TODO: Fix up all this commented garbage
+//Really the entire display system needs rethinking first but yea
+void drawDeltaColumn(int column)
+{
+	char *times[segCount];
+	for (int i = 0; i < segCount; i++) {
+		times[i] = calloc(1, COLSTRLEN);
+		int time = 0;
+		if (i == currSeg)
+			time = currentMS - pbrun[i].ms;
+		else if (i < currSeg)
+			time = segments[i].ms - pbrun[i].ms;
+		ftime(times[i], time, 1, true);
+		struct color col = {0};
+		if (time <= 0)
+			col = good;
+		else
+			col = bad;
+		if (i < currSeg)
+			drawCell(times[i], column, i + 6, col);
+		if (i == currSeg && time >= -5000)
+			drawCell(times[i], column, i + 6, col);
+	}
+	//drawColumn(times, segCount, column, currSeg);
+	//Use drawCell because we're doing colors.
+	//for (int i = 0; i < segCount; i++) {
+	//	if (i <= currSeg)
+	//		drawCell(times[i], column, i + 6, good);
+	//}
+	setFGColor(fg);
+	for (int i = 0; i < segCount; i++) {
+		free(times[i]);
+	}
 }
 
 //TODO: try to clean the branching up
 void drawTimeColumn(int timeoption, int column)
 {
 	char *times[segCount];
+	int drawEnd = currSeg;
 	for (int i = 0; i < segCount; i++) {
-		times[i] = calloc(1, 11);
+		times[i] = calloc(1, COLSTRLEN);
 		int time = 0;
 		switch (timeoption) {
 		case 0:
 			time = pbrun[i].ms;
-			break;
-		case 1:
-			if (i == currSeg)
-				time = currentMS - pbrun[i].ms;
-			else
-				time = segments[i].ms - pbrun[i].ms;
+			drawEnd = segCount;
 			break;
 		case 2:
 			if (i > 0 && i < currSeg)
@@ -207,9 +316,9 @@ void drawTimeColumn(int timeoption, int column)
 			else
 				time = segments[i].ms;
 		}
-		ftime(times[i], false, time);
+		ftime(times[i], time, 1, false);
 	}
-	drawColumn(times, segCount, column);
+	drawColumn(times, segCount, column, drawEnd);
 	for (int i = 0; i < segCount; i++) {
 		free(times[i]);
 	}
@@ -249,7 +358,8 @@ void drawDisplay()
 	sprintf(atmpt, "%9d", attempts);
 	rghtPrint(2, w, atmpt);
 	cntrPrint(1, w / 2, w, gameTitle);
-	cntrPrint(2, w / 2, w, categoryTitle);	
+	cntrPrint(2, w / 2, w, categoryTitle);
+	setFGColor(fade);
 	drawHLine(5, w);
 	printf("\033[5;3H");
 	if (hotkeys_enabled || compact)
@@ -260,26 +370,34 @@ void drawDisplay()
 		printf("c");
 	if (hotkeys_enabled || compact)
 		printf("]");
+	setFGColor(fg);
 	drawSegmentNames();
 	//TODO: The column names stuff has to be more dynamic, part of the
 	//drawColumn function probably
 	if (!compact) {
 		char cols[41];
 		sprintf(cols, "%10s%10s%10s%10s", "Delta", "Sgmt", "Time", "PB");
+		setFGColor(fade);
 		rghtPrint(4, w, cols);
+		setFGColor(fg);
 		drawTimeColumn(0, 1);
 		drawTimeColumn(3, 2);
 		drawTimeColumn(2, 3);
-		drawTimeColumn(1, 4);
-	} else {
+		drawDeltaColumn(4);
+	} else {	
 		char cols[21];
 		sprintf(cols, "%10s%10s", "Delta", "Time/PB");
+		setFGColor(fade);
 		rghtPrint(4, w, cols);
+		setFGColor(fg);
+		drawTimeColumn(0, 1);
 		drawTimeColumn(3, 1);
-		drawTimeColumn(1, 2);
+		drawDeltaColumn(2);
 	}
+	setFGColor(fade);
 	drawHLine(segCount + 6, w);
-	ftime(currentTime, true, currentMS);
+	setFGColor(fg);
+	ftime(currentTime, currentMS, 2, false);
 	rghtPrint(segCount + 7, w, currentTime);
 	fflush(stdout);
 }
@@ -435,9 +553,9 @@ void loadFile()
 			cJSON_ArrayForEach(iIterator, oIterator) {
 				struct pastseg t;
 				
-				cJSON *rms = cJSON_GetItem(iIterator, "rms");
-				cJSON *skp = cJSON_GetItem(iIterator, "skipped");
-				cJSON *rst = cJSON_GetItem(iIterator, "reset");
+				cJSON *rms = cJSON_GetItem(iIterator, "m");
+				cJSON *skp = cJSON_GetItem(iIterator, "s");
+				cJSON *rst = cJSON_GetItem(iIterator, "r");
 
 				t.ms = rms->valueint;
 				if (cJSON_IsTrue(skp))
@@ -507,6 +625,95 @@ void importSplitsIO(cJSON *splitfile)
 	cJSON_Delete(splitfile);
 }
 
+void exportSplitsIO()
+{
+	//cJSON root node
+	cJSON *export          = NULL;
+
+	//Schema version
+	cJSON *schema          = NULL;
+
+	//Links
+	cJSON *links_root      = NULL;
+	cJSON *speedruncom_id  = NULL;
+	cJSON *splitsio_id     = NULL;
+	
+	//Timer
+	cJSON *timer_root      = NULL;
+	cJSON *timer_shortname = NULL;
+	cJSON *timer_longname  = NULL;
+	cJSON *timer_version   = NULL;
+	cJSON *timer_website   = NULL;
+
+	//Attempts
+	cJSON *attempts_root   = NULL;
+	cJSON *attempts_total  = NULL;
+	cJSON *histories       = NULL;
+	cJSON *history_root    = NULL;
+	cJSON *history_attmpt  = NULL;
+	cJSON *history_dur     = NULL;
+	cJSON *history_dur_rms = NULL;
+	cJSON *history_dur_gms = NULL;
+
+	//Supplementary data
+	cJSON *image_url       = NULL;
+	cJSON *video_url       = NULL;
+
+	//Time
+	cJSON *started_at      = NULL;
+	cJSON *ended_at        = NULL;
+
+	//Pauses
+	cJSON *pauses_root     = NULL;
+	cJSON *pause_started   = NULL;
+	cJSON *pause_ended     = NULL;
+
+	//Game
+	cJSON *game_root       = NULL;
+	cJSON *game_longname   = NULL;
+	cJSON *game_shortname  = NULL;
+	cJSON *game_links      = NULL;
+	cJSON *game_srcom_id   = NULL;
+	cJSON *game_splits_id  = NULL;
+
+	//Catagory
+	cJSON *cate_root       = NULL;
+	cJSON *cate_longname   = NULL;
+	cJSON *cate_shortname  = NULL;
+	cJSON *cate_links      = NULL;
+	cJSON *cate_splits_id  = NULL;
+	cJSON *cate_spdrun_id  = NULL;
+
+	//Runners
+	cJSON *runner_root     = NULL;
+	cJSON *runner_longname = NULL;
+	cJSON *runner_shrtname = NULL;
+	cJSON *runner_links    = NULL;
+	cJSON *runner_twitch   = NULL;
+	cJSON *runner_spltsio  = NULL;
+	cJSON *runner_spdrun   = NULL;
+	cJSON *runner_twitter  = NULL;
+
+	//Segments
+	cJSON *seg_root        = NULL;
+	cJSON *seg_name        = NULL;
+	cJSON *seg_ended       = NULL;
+	cJSON *seg_ended_rms   = NULL;
+	cJSON *seg_ended_gms   = NULL;
+	cJSON *seg_best        = NULL;
+	cJSON *seg_best_rms    = NULL;
+	cJSON *seg_best_gms    = NULL;
+	cJSON *seg_is_skipped  = NULL;
+	cJSON *seg_is_reset    = NULL;
+	cJSON *seg_histories   = NULL;
+	cJSON *seg_hst_attmp   = NULL;
+	cJSON *seg_hst_end     = NULL;
+	cJSON *seg_hst_end_rms = NULL;
+	cJSON *seg_hst_end_gms = NULL;
+	cJSON *seg_hst_skp     = NULL;
+	cJSON *seg_hst_rst     = NULL;
+}
+
 void saveFile()
 {
 	if (timerActive)
@@ -550,9 +757,9 @@ void saveFile()
 			cJSON *skp = cJSON_CreateBool(t.isSkipped);
 			cJSON *rst = cJSON_CreateBool(t.isReset);
 
-			cJSON_AddItemToObject(seg, "rms", tim);
-			cJSON_AddItemToObject(seg, "skipped", skp);
-			cJSON_AddItemToObject(seg, "reset", rst);
+			cJSON_AddItemToObject(seg, "m", tim);
+			cJSON_AddItemToObject(seg, "s", skp);
+			cJSON_AddItemToObject(seg, "r", rst);
 
 			cJSON_AddItemToArray(run, seg);
 		}
