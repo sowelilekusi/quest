@@ -436,13 +436,17 @@ void calculateBestSegs()
 	if (attempts == 0)
 		return;
 	for (int i = 0; i < segCount; i++) {
-		int bms = INT_MAX;
+		int bestDuration = INT_MAX;
 		for (int j = 0; j < attempts; j++) {
-			int cms = pastRuns[(j * segCount) + i].ms;
-			if (cms != 0 && cms < bms)
-				bms = cms;
+			int duration = pastRuns[(j * segCount) + i].ms;
+			if (i != 0)
+				duration -= bestsegs[i-1].ms;
+			if (duration != 0 && duration < bestDuration)
+				bestDuration = duration;
 		}
-		bestsegs[i].ms = bms;
+		bestsegs[i].ms = bestDuration;
+		if (i != 0)
+			bestsegs[i].ms += bestsegs[i-1].ms;
 	}
 }
 

@@ -37,10 +37,10 @@ yet and may not ever be
 
 ### [Splits.io](https://splits.io/)
 
-[X] Import game, category and segment names from generic format
-[]  Import all information the generic format support i.e. run histories
-[]  Export runs in the generic format
+- [X] Import game, category and segment names from generic format
+- [ ]  Import all information the generic format support i.e. run histories
+- [ ]  Export runs in the generic format
 
 ### [Speedrun.com](https://www.speedrun.com/)
 
-[] Submit runs
+- [ ] Submit runs
