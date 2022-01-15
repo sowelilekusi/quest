@@ -36,6 +36,14 @@ struct pastseg
 	bool isReset;
 };
 
+extern char *gameTitle;
+extern char *categoryTitle;
+extern int segCount;
+extern struct segment *pbrun;
+extern struct segment *bestsegs;
+extern struct segment *wrrun;
+extern struct segment *segments;
+
 void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td);
 void add_timespec(struct timespec t1, struct timespec t2, struct timespec* td);
 void start();

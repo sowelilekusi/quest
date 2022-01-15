@@ -13,8 +13,8 @@ A speedrun timer for \*nix terminals
 ## Usage
 
 Copy `examples/sample.json` somewhere, replace the sample information with
-the names of your game, catagories and splits. Changing the number of
-splits after the first use of the split file is currently unsupported.
+the names of your game, categories and segments. Changing the number of
+segments after the first use of the split file is currently unsupported.
 
 ### Default Keybinds
 | Keys | Action                | Global |
@@ -29,3 +29,18 @@ splits after the first use of the split file is currently unsupported.
 | `C`  | Toggle compact UI     | NO     |
 
 Customisable hotkeys without editing the source code coming soon!
+
+## Third Party Integration
+
+If a feature isn't listed here, it probably isn't planned
+yet and may not ever be
+
+### [Splits.io](https://splits.io/)
+
+[X] Import game, category and segment names from generic format
+[]  Import all information the generic format support i.e. run histories
+[]  Export runs in the generic format
+
+### [Speedrun.com](https://www.speedrun.com/)
+
+[] Submit runs

@@ -1,7 +1,7 @@
 #ifndef KEYS_H
 #define KEYS_H
 
-#include <uiohook.h>
+#include "uiohook.h"
 #include <unistd.h>
 #include "timer.h"
 #include "display.h"

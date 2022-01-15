@@ -4,7 +4,7 @@
 int maxrows = INT_MAX;
 int maxcols = INT_MAX;
 int colwidth = 10;
-int in = 0;
+int in;
 
 struct termios base;
 

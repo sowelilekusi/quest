@@ -5,6 +5,8 @@ char buf;
 int pipefd[2];
 struct keymap km;
 
+char *keystrings[2] = {"a", "b"};
+
 bool logger_proc(unsigned int level, const char *format, ...) {
 	return 0;
 }
