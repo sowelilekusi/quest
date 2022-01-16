@@ -4,7 +4,7 @@
 const char *schemaver  = "v1.0.1";
 const char *timersname = "quest";
 const char *timerlname = "Quinn's Utterly Elegant Speedrun Timer";
-const char *timerver   = "v0.5.1";
+const char *timerver   = "v0.6.0";
 const char *timerlink  = "https://github.com/SilentFungus/quest";
 
 //Imports game/catagory names and segment names
