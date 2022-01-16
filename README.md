@@ -28,7 +28,7 @@ segments after the first use of the split file is currently unsupported.
 | `T`  | Toggle global hotkeys | YES    |
 | `C`  | Toggle compact UI     | NO     |
 
-Customisable hotkeys without editing the source code coming soon!
+Hotkeys can be configured in `$HOME/.config/quest/keymaps/default`
 
 ## Third Party Integration
 

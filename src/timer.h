@@ -3,6 +3,7 @@
 
 #include "display.h"
 #include "keys.h"
+#include "splitsio.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -52,7 +53,6 @@ void split();
 void tpause();
 void unsplit();
 void skip();
-void loadKeymap();
 void ftime(char *timestr, int rms, int decimals, bool sign);
 int timespecToMS(struct timespec t);
 void drawNotif();
@@ -62,8 +62,9 @@ void drawTimeColumn();
 void toggleCompact();
 void drawDisplay();
 void resize(int i);
-void importSplitsIO(cJSON *splitfile);
 void calculatePB();
+void loadConfig();
+void saveConfig(cJSON *config);
 void loadFile();
 void saveFile();
 int main(int argc, char **argv);

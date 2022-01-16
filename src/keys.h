@@ -14,6 +14,8 @@
 #define K_USPLT 6
 #define K_SKIP  7
 
+#define KEYNUM 77
+
 extern bool hotkeys_enabled;
 
 struct keymap
@@ -31,9 +33,13 @@ extern char buf;
 extern int pipefd[2];
 extern struct keymap km;
 
+extern char *keystrings[77];
+
 bool logger_proc(unsigned int level, const char *format, ...);
 void dispatch_proc(uiohook_event * const event);
 int handleInput();
+void loadKeymap();
+uint16_t keystringToKeycode(char *keystring);
 
 #endif
 

@@ -21,6 +21,7 @@ bool dirty   = false;
 
 //Run data
 char *filepath;
+char *configpath;
 char *gameTitle     = "title not loaded";
 char *categoryTitle = "category not loaded";
 int attempts        = 0;
@@ -118,17 +119,6 @@ void skip()
 	currSeg++;
 	if (currSeg >= segCount)
 		stop();
-}
-
-void loadKeymap()
-{
-	km.START = VC_R;
-	km.STOP  = VC_F;
-	km.PAUSE = VC_D;
-	km.SPLIT = VC_E;
-	km.HOTKS = VC_T;
-	km.USPLT = VC_G;
-	km.SKIP  = VC_V;
 }
 
 void ftime(char *timestr, int rms, int decimals, bool sign)
@@ -452,15 +442,94 @@ void calculateBestSegs()
 
 void loadConfig()
 {
+	cJSON *config = NULL;
 	char path[256];
 	strcat(strcpy(path, getenv("HOME")), "/.config/quest");
 	mkdir(path, 0777);
 	strcat(strcpy(path, getenv("HOME")), "/.config/quest/keymaps");
 	mkdir(path, 0777);
 	strcat(strcpy(path, getenv("HOME")), "/.config/quest/keymaps/default");
+	configpath = malloc(strlen(path));
+	strcpy(configpath, path);
 	
-	FILE* fp = fopen(path, "r");
-	fclose(fp);
+	long length;
+	FILE* f = fopen(path, "rb");
+	if (f != NULL) {
+		char *buffer = NULL;
+		fseek(f, 0, SEEK_END);
+		length = ftell(f);
+		fseek(f, 0, SEEK_SET);
+		buffer = malloc(length + 1);
+		if (buffer != NULL)
+			fread(buffer, 1, length, f);
+		fclose(f);
+		buffer[length] = '\0';
+
+		config = cJSON_Parse(buffer);
+		free(buffer);
+
+		cJSON *startkey = cJSON_GetItem(config, "start");
+		cJSON *stopkey = cJSON_GetItem(config, "stop");
+		cJSON *pausekey = cJSON_GetItem(config, "pause");
+		cJSON *splitkey = cJSON_GetItem(config, "split");
+		cJSON *hotkskey = cJSON_GetItem(config, "toggle hotkeys");
+		cJSON *uspltkey = cJSON_GetItem(config, "unsplit");
+		cJSON *skipkey = cJSON_GetItem(config, "skip");
+
+		if (cJSON_IsString(startkey) && (startkey->valuestring != NULL))
+			km.START = keystringToKeycode(startkey->valuestring);
+		if (cJSON_IsString(stopkey) && (stopkey->valuestring != NULL))
+			km.STOP = keystringToKeycode(stopkey->valuestring);
+		if (cJSON_IsString(pausekey) && (pausekey->valuestring != NULL))
+			km.PAUSE = keystringToKeycode(pausekey->valuestring);
+		if (cJSON_IsString(splitkey) && (splitkey->valuestring != NULL))
+			km.SPLIT = keystringToKeycode(splitkey->valuestring);
+		if (cJSON_IsString(hotkskey) && (hotkskey->valuestring != NULL))
+			km.HOTKS = keystringToKeycode(hotkskey->valuestring);
+		if (cJSON_IsString(uspltkey) && (uspltkey->valuestring != NULL))
+			km.USPLT = keystringToKeycode(uspltkey->valuestring);
+		if (cJSON_IsString(skipkey) && (skipkey->valuestring != NULL))
+			km.SKIP = keystringToKeycode(skipkey->valuestring);
+	} else {
+		config = cJSON_CreateObject();
+		km.START = VC_R;
+		km.STOP  = VC_F;
+		km.PAUSE = VC_D;
+		km.SPLIT = VC_E;
+		km.HOTKS = VC_T;
+		km.USPLT = VC_G;
+		km.SKIP  = VC_V;
+		cJSON *startkey = cJSON_CreateString("r");
+		cJSON_AddItemToObject(config, "start", startkey);
+		cJSON *stopkey = cJSON_CreateString("f");
+		cJSON_AddItemToObject(config, "stop", stopkey);
+		cJSON *pausekey = cJSON_CreateString("d");
+		cJSON_AddItemToObject(config, "pause", pausekey);
+		cJSON *splitkey = cJSON_CreateString("e");
+		cJSON_AddItemToObject(config, "split", splitkey);
+		cJSON *hotkskey = cJSON_CreateString("t");
+		cJSON_AddItemToObject(config, "toggle hotkeys", hotkskey);
+		cJSON *uspltkey = cJSON_CreateString("g");
+		cJSON_AddItemToObject(config, "unsplit", uspltkey);
+		cJSON *skipkey = cJSON_CreateString("v");
+		cJSON_AddItemToObject(config, "skip", skipkey);
+		saveConfig(config);
+	}
+	cJSON_Delete(config);
+}
+
+void saveConfig(cJSON *config)
+{
+	char *string = cJSON_Print(config);
+	if (string != NULL) {
+		FILE *f = fopen(configpath, "w");
+		if (f == NULL)
+			return;
+		
+		fwrite(string, 1, strlen(string), f);
+		
+		fclose(f);
+	}
 }
 
 //TODO: it'll be more efficent if all the segments pointers point at the same
@@ -655,7 +724,7 @@ int main(int argc, char **argv)
 
 	pipe(pipefd);
 	fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
-	loadKeymap();
+	loadConfig();
 	cpid = fork();
 	
 	if (cpid == 0) {

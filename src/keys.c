@@ -5,7 +5,37 @@ char buf;
 int pipefd[2];
 struct keymap km;
 
-char *keystrings[2] = {"a", "b"};
+char *keystrings[KEYNUM] = {
+	  "a",   "b",   "c",   "d",   "e",   "f",
+	  "g",   "h",   "i",   "j",   "k",   "l",
+	  "m",   "n",   "o",   "p",   "q",   "r",
+	  "s",   "t",   "u",   "v",   "w",   "x",
+	  "y",   "z",   "1",   "2",   "3",   "4",
+	  "5",   "6",   "7",   "8",   "9",   "0",
+	 "F1",  "F2",  "F3",  "F4",  "F5",  "F6",
+	 "F7",  "F8",  "F9", "F10", "F11", "F12",
+	"F13", "F14", "F15", "F16", "F17", "F18",
+	"F19", "F20", "F21", "F22", "F23", "F24",
+	"ESC",   "`",   "-",   "=", "BSP", "TAB",
+	"CAP",   "[",   "]",  "\\",   ";",  "\"",
+	"ENT",   ",",   ".",   "/",   " ",
+};
+
+uint16_t uiohookKeycodes[KEYNUM] = {
+	        VC_A,            VC_B,             VC_C,          VC_D,         VC_E,  VC_F,
+	        VC_G,            VC_H,             VC_I,          VC_J,         VC_K,  VC_L,
+	        VC_M,            VC_N,             VC_O,          VC_P,         VC_Q,  VC_R,
+	        VC_S,            VC_T,             VC_U,          VC_V,         VC_W,  VC_X,
+	        VC_Y,            VC_Z,             VC_1,          VC_2,         VC_3,  VC_4,
+	        VC_5,            VC_6,             VC_7,          VC_8,         VC_9,  VC_0,
+	       VC_F1,           VC_F2,            VC_F3,         VC_F4,        VC_F5, VC_F6,
+	       VC_F7,           VC_F8,            VC_F9,        VC_F10,       VC_F11, VC_F12,
+	      VC_F13,          VC_F14,           VC_F15,        VC_F16,       VC_F17, VC_F18,
+	      VC_F19,          VC_F20,           VC_F21,        VC_F22,       VC_F23, VC_F24,
+	   VC_ESCAPE,    VC_BACKQUOTE,         VC_MINUS,     VC_EQUALS, VC_BACKSPACE,   VC_TAB,
+	VC_CAPS_LOCK, VC_OPEN_BRACKET, VC_CLOSE_BRACKET, VC_BACK_SLASH, VC_SEMICOLON, VC_QUOTE,
+	    VC_ENTER,        VC_COMMA,        VC_PERIOD,      VC_SLASH,     VC_SPACE
+};
 
 bool logger_proc(unsigned int level, const char *format, ...) {
 	return 0;
@@ -70,3 +100,22 @@ int handleInput()
 		skip();
 	return 0;
 }
+
+void loadKeymap()
+{
+	km.START = VC_R;
+	km.STOP  = VC_F;
+	km.PAUSE = VC_D;
+	km.SPLIT = VC_E;
+	km.HOTKS = VC_T;
+	km.USPLT = VC_G;
+	km.SKIP  = VC_V;
+}
+
+uint16_t keystringToKeycode(char *keystring) {
+	for (int i = 0; i < KEYNUM; i++)
+		if (strcmp(keystring, keystrings[i]) == 0)
+			return uiohookKeycodes[i];
+	return NULL;
+}
+
