@@ -449,7 +449,7 @@ void loadConfig()
 	strcat(strcpy(path, getenv("HOME")), "/.config/quest/keymaps");
 	mkdir(path, 0777);
 	strcat(strcpy(path, getenv("HOME")), "/.config/quest/keymaps/default");
-	configpath = malloc(strlen(path));
+	configpath = malloc(strlen(path) + 1);
 	strcpy(configpath, path);
 	
 	long length;
@@ -575,14 +575,14 @@ void loadFile()
 	if (game) {
 		cJSON *title = cJSON_GetItem(game, "name");
 		if (cJSON_IsString(title) && (title->valuestring != NULL)) {
-			gameTitle = malloc(strlen(title->valuestring));
+			gameTitle = malloc(strlen(title->valuestring) + 1);
 			strcpy(gameTitle, title->valuestring);
 		}
 	}
 	if (cate) {
 		cJSON *title = cJSON_GetItem(cate, "name");
 		if (cJSON_IsString(title) && (title->valuestring != NULL)) {
-			categoryTitle = malloc(strlen(title->valuestring));
+			categoryTitle = malloc(strlen(title->valuestring) + 1);
 			strcpy(categoryTitle, title->valuestring);
 		}
 	}
@@ -603,7 +603,7 @@ void loadFile()
 		cJSON_ArrayForEach(iterator, segs) {
 			segname = cJSON_GetItem(iterator, "name");
 			if (cJSON_IsString(segname) && (segname->valuestring != NULL)) {
-				segments[it].name = malloc(strlen(segname->valuestring));
+				segments[it].name = malloc(strlen(segname->valuestring) + 1);
 				strcpy(segments[it].name, segname->valuestring);
 			}
 			it++;
