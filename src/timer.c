@@ -53,6 +53,8 @@ void start()
 {
 	if (timerActive || segCount == 0)
 		return;
+	//for now we do this here for reasons explained in stop()
+	calculatePB();
 	clock_gettime(CLOCK_REALTIME, &timestart);
 	timerActive    = true;
 	//Reset state of timer
@@ -84,7 +86,10 @@ void stop()
 		t.isReset    = segments[i].isReset;
 		pastRuns[((attempts-1) * segCount) + i] = t;
 	}
-	calculatePB();
+	//If this is done here you wont get a chance to peep your deltas on 
+	//a pb coz the ui will just update and zero them all out if your current
+	//run is the pb run youre now comparing to
+	//calculatePB();
 	saveFile();
 }
 
