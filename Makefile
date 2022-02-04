@@ -1,5 +1,5 @@
 TARGET = quest
-LIBS   = -lm -luiohook
+LIBS   = -lm -luiohook -lcjson
 CC     = gcc
 CFLAGS = -g -Wall
 INSTALL_PATH = /usr/local

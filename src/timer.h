@@ -17,7 +17,7 @@
 #include <sys/ioctl.h>
 #include <signal.h>
 #include <math.h>
-#include "cJSON.h"
+#include <cjson/cJSON.h>
 
 #define NS_PER_S  1000000000
 #define cJSON_GetItem(x, y) cJSON_GetObjectItemCaseSensitive(x, y)

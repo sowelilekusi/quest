@@ -1,7 +1,7 @@
 #ifndef SPLITSIO_H
 #define SPLITSIO_H
 
-#include "cJSON.h"
+#include <cjson/cJSON.h>
 #include "timer.h"
 
 //const char *schemaver;
