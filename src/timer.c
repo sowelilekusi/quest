@@ -404,6 +404,9 @@ void resize(int i)
 void calculatePB()
 {
 	bool valid      = false;
+	//TODO: come back to this value, this function should be redone a little
+	int PBsfound    = 0;
+
 	int bestMS      = INT_MAX;
 	int bestAttempt = 0;
 
@@ -417,11 +420,12 @@ void calculatePB()
 				valid = false;
 		}
 		if (valid && pastRuns[run + segCount - 1].ms < bestMS) {
+			PBsfound++;
 			bestAttempt = i;
 			bestMS = pastRuns[run + segCount - 1].ms;
 		}
 	}
-	if (valid)
+	if (PBsfound > 0)
 		for (int i = 0; i < segCount; i++)
 			pbrun[i].ms = pastRuns[(bestAttempt * segCount) + i].ms;
 }
