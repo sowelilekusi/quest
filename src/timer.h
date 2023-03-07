@@ -39,11 +39,16 @@ struct pastseg
 
 extern char *gameTitle;
 extern char *categoryTitle;
+extern int currentMS;
+extern int currSeg;
 extern int segCount;
+extern int attempts;
+extern char currentTime[10];
 extern struct segment *pbrun;
 extern struct segment *bestsegs;
 extern struct segment *wrrun;
 extern struct segment *segments;
+extern struct timespec notif;
 
 void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td);
 void add_timespec(struct timespec t1, struct timespec t2, struct timespec* td);
@@ -53,15 +58,7 @@ void split();
 void tpause();
 void unsplit();
 void skip();
-void ftime(char *timestr, int rms, int decimals, bool sign);
 int timespecToMS(struct timespec t);
-void drawNotif();
-void clearNotif();
-void drawSegmentNames();
-void drawTimeColumn();
-void toggleCompact();
-void drawDisplay();
-void resize(int i);
 void calculatePB();
 void loadConfig();
 void saveConfig(cJSON *config);
