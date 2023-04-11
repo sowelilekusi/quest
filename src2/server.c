@@ -348,7 +348,8 @@ int main(int argc, char *argv[])
 	int n, pid;
 	run = malloc(sizeof(struct run_event) * runMaxLength);
 	//TODO: remove this file testing boilerplate
-	addFile(argv[1]);
+	if (argc > 1)
+		addFile(argv[1]);
 
 	/* First call to socket() function */
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
