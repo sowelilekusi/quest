@@ -67,30 +67,19 @@ void printbig(int x, int y, int ms)
 		printf("\033[%d;%dH", y + sy, x);    //go to position
 		for (int cc = 0; cc < 12; cc++) {    //then, for every character
 			int c = small[cc];           //check what character we're on
-			if (c >= 48 && c <= 57) {    //if its a number, print 4 pixels
-				for (int xx = 0; xx < 4; xx++) {
-					int xxx = c - 48;
-					if (numbermap[sy][(xxx * 4) + xx] == 'x')
-						printf("\033[48;2;%d;%d;%dm ", f.r, f.g, f.b);
-					if (numbermap[sy][(xxx * 4) + xx] == '.')
-						printf("\033[48;2;%d;%d;%dm ", b.r, b.g, b.b);
-				}
-			}
-			if (c == 46 || c == 58) {                 //if its punctuation, print 2 pixels
-				for (int xx = 0; xx < 2; xx++) {
-					if (c == 46) {
-						if (numbermap[sy][42 + xx] == 'x')
-							printf("\033[48;2;%d;%d;%dm ", f.r, f.g, f.b);
-						if (numbermap[sy][42 + xx] == '.')
-							printf("\033[48;2;%d;%d;%dm ", b.r, b.g, b.b);
-					}
-					if (c == 58) {
-						if (numbermap[sy][40 + xx] == 'x')
-							printf("\033[48;2;%d;%d;%dm ", f.r, f.g, f.b);
-						if (numbermap[sy][40 + xx] == '.')
-							printf("\033[48;2;%d;%d;%dm ", b.r, b.g, b.b);
-					}
-				}
+			int mapcharacterwidth = (c >= 48 && c <= 57) ? 4 : 2;//if its a number, print 4 pixels, if its punctuation, print 2 pixels
+			int mapoffset;
+			if (c >= 48 && c <= 57)    
+				mapoffset = (c - 48) * 4;
+			else if (c == 46)
+				mapoffset = 42;
+			else
+				mapoffset = 40;
+			for (int xx = 0; xx < mapcharacterwidth; xx++) {
+				if (numbermap[sy][mapoffset + xx] == 'x')
+					printf("\033[48;2;%d;%d;%dm ", f.r, f.g, f.b);
+				if (numbermap[sy][mapoffset + xx] == '.')
+					printf("\033[48;2;%d;%d;%dm ", b.r, b.g, b.b);
 			}
 		}
 	}

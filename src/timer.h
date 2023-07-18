@@ -24,6 +24,7 @@
 
 struct segment
 {
+	int id;
         char *name;
         int ms;
         bool isSkipped;
@@ -49,6 +50,7 @@ extern struct segment *bestsegs;
 extern struct segment *wrrun;
 extern struct segment *segments;
 extern struct timespec notif;
+extern int *route;
 
 void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td);
 void add_timespec(struct timespec t1, struct timespec t2, struct timespec* td);

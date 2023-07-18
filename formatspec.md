@@ -102,9 +102,9 @@ Runs by themselves are simply a list of events that occured
 to this data, these more complicated directives are used to define segments
 that are played between splits and routes made up of these segments.
 Define all your possible segments first, followed by all routes.
-If no segments are defined, a single unnamed segment is assumed.
+If no segments are defined, a single unnamed segment is to be assumed.
 If no routes are defined, a single unnamed route that passes through all
-segments in the order of their definition is assumed.
+segments in the order of their definition is to be assumed.
 
 Segment
 	Shortname
@@ -141,7 +141,7 @@ Run Directives
 These directives are much more complicated and are not intended to be written
 by a human but rather by the timer software, they will make up the majority
 of a file as they are the run history which may be quite long.
-These data passed by these directives exists agnostic of segments, route, games,
+The data passed by these directives exists agnostic of segments, route, games,
 or categories, rather they are either explicitly matched with metadata that is
 applicable, or by default is matched with the last set of metadata declared by
 the time of the run directive

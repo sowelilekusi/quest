@@ -1,5 +1,5 @@
 TARGET = quest
-LIBS   = -lm -luiohook -lcjson
+LIBS   = -lm -luiohook -lcjson -lxcb -lXinerama -lX11
 CC     = gcc
 CFLAGS = -g -Wall
 INSTALL_PATH = /usr/local

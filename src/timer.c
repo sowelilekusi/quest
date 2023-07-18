@@ -22,6 +22,7 @@ struct pastseg *pastRuns;
 int segCount;
 int currSeg = -1;
 char currentTime[10];
+int *route;
 
 void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td)
 {

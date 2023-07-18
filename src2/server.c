@@ -220,10 +220,12 @@ void loadFiles()
 			fgets(buff2, 255, fp);
 			if (buff2[0] == '\t') {
 				valuecount++;
+				
 				names = realloc(names, sizeof(char*) * valuecount);
 				names[valuecount - 1] = malloc(strlen(buff) - 1);
 				strncpy(names[valuecount - 1], buff, strlen(buff) - 1);
 				names[valuecount - 1][strlen(buff)] = '\0';
+
 				values = realloc(values, sizeof(char*) * valuecount);
 				values[valuecount - 1] = malloc(strlen(buff2) - 2);
 				strncpy(values[valuecount - 1], buff2 + 1, strlen(buff2) - 1);
@@ -373,43 +375,18 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	/* Now start listening for the clients, here
-	 * process will go in sleep mode and will wait
-	 * for the incoming connection
-	 */
-
 	listen(sockfd,5);
 	clilen = sizeof(cli_addr);
 
 	while (alive) {
 		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-
 		if (newsockfd < 0) {
 			perror("ERROR on accept");
 			exit(1);
 		}
-
-		/* Create child process */
-		//pid = fork();
-		pid = 1;
-
-		if (pid < 0) {
-			perror("ERROR on fork");
-			exit(1);
-		}
-
-		if (pid == 0) {
-			/* This is the child process */
-			//close(sockfd);
-			//doprocessing(newsockfd);
-			//exit(0);
-		}
-		else {
-			doprocessing(newsockfd);
-			close(newsockfd);
-		}
-
-	} /* end of while */
+		doprocessing(newsockfd);
+		close(newsockfd);
+	}
 	free(run);
 	close(sockfd);
 }
