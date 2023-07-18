@@ -215,19 +215,19 @@ void loadFiles()
 			char *x = fgets(buff, 255, fp);
 			if (buff[0] == '/' && buff[1] == '/' || buff[0] == '\n')
 				continue;
-			if (!strcmp(buff, "Segment") || !strcmp(buff, "Route") || x == NULL)
+			if (!strcmp(buff, "Segment\n") || !strcmp(buff, "Route\n") || x == NULL)
 				break;
 			fgets(buff2, 255, fp);
 			if (buff2[0] == '\t') {
 				valuecount++;
 				
 				names = realloc(names, sizeof(char*) * valuecount);
-				names[valuecount - 1] = malloc(strlen(buff) - 1);
+				names[valuecount - 1] = malloc(strlen(buff));
 				strncpy(names[valuecount - 1], buff, strlen(buff) - 1);
 				names[valuecount - 1][strlen(buff)] = '\0';
 
 				values = realloc(values, sizeof(char*) * valuecount);
-				values[valuecount - 1] = malloc(strlen(buff2) - 2);
+				values[valuecount - 1] = malloc(strlen(buff2) - 1);
 				strncpy(values[valuecount - 1], buff2 + 1, strlen(buff2) - 1);
 				values[valuecount - 1][strlen(buff2)] = '\0';
 			}
