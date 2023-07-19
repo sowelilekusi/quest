@@ -31,6 +31,17 @@ struct color bl = {224,  34,  34}; //Behind, and losing time segment color
 
 int w, h;
 
+//functions
+void timestring(char *str, int ms);
+void printbig(int x, int y, int ms);
+int timestringDigits(int ms);
+void resize(int i);
+void initScreen();
+void resetScreen();
+void die(int i);
+void processColorString(struct color *c, char* s);
+
+
 int timestringDigits(int ms)
 {
 	int chars = 4;
@@ -112,7 +123,7 @@ void initScreen()
 	t.c_lflag &= (~ECHO & ~ICANON);
 	tcsetattr(1, TCSANOW, &t);
 	//TODO:Figure out why i did this
-	dup(0);
+	//dup(0);
 	fcntl(0, F_SETFL, O_NONBLOCK);
 	printf("\033[?1049h\n");         //Switch to TUI mode (alternate buffer)
 	printf("\033[?25l\n");           //Hide text cursor

@@ -147,6 +147,8 @@ applicable, or by default is matched with the last set of metadata declared by
 the time of the run directive
 
 Run
+	Category
+		Any%
 	Route
 		Magic Swordless
 	Start
@@ -163,7 +165,7 @@ Run
 		3121111
 	Pause
 		421397
-	Unpause
+	Resume
 		2016-10-23 11:16:04.175Z
 	Stop                   (The last event in a run is always a Stop)
 		123111

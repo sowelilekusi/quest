@@ -30,6 +30,8 @@ struct run_event {
 	struct timespec time;
 };
 
+char* current_category = NULL;
+char* current_route = NULL;
 struct run_event *run;
 //Enough to hold a sm64 16 star, can realloc later
 int runMaxLength = 12;
@@ -37,10 +39,36 @@ int runMarker    = 0;
 int runMarker2   = 0;
 
 //save file stuff
+char *default_file_name = "untitled.quest";
 int files = 0;
 char **filePaths = NULL;
 char **names, **values;
 int valuecount;
+
+//functions
+void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td);
+void offset_timespec(int milliseconds, struct timespec* t);
+int timespecToMS(struct timespec t);
+void extend_run();
+void add_event(enum event_type t);
+void start();
+void stop();
+void split();
+void skip();
+void addPauseTime();
+void subtractPauseTime();
+void undo();
+void redo();
+void pause_timer();
+void resume();
+void appendRunToFile();
+void timespecToRFC3339(struct timespec t, char buf[]);
+void loadFiles();
+void addFile(char *path);
+void sendTime(int sock);
+void sendValue(int sock, char* name);
+void doprocessing (int sock);
+
 
 void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td)
 {
@@ -99,6 +127,8 @@ void start()
 	//TODO: Save the old run to the file before the new one starts,
 	//the reason to do this here is it gives the runner a chance to undo
 	//if they accidentally hit the stop button
+	if (run[runMarker - 1].type == STOP)
+		appendRunToFile();
 	//TODO: Clear the run data first
 	timerActive = true;
 	add_event(START);
@@ -199,6 +229,77 @@ void resume()
 		paused = false;
 		addPauseTime();
 	}
+}
+
+void appendRunToFile()
+{
+	char* save_path = NULL;
+	if (files <= 0)
+		save_path = default_file_name;
+	else
+		save_path = filePaths[0];
+	FILE* fp;
+
+	fp = fopen(save_path, "a+");
+	fprintf(fp, "%s\n", "Run");
+	if (current_category != NULL) {
+		fprintf(fp, "\t%s\n", "Category");
+		fprintf(fp, "\t\t%s\n", current_category);
+	}
+	if (current_route != NULL) {
+		fprintf(fp, "\t%s\n", "Route");
+		fprintf(fp, "\t\t%s\n", current_route);
+	}
+
+	int i = 0;
+	bool done = false;
+	while (!done) {
+		if (run[i].type == STOP) {
+			done = true;
+		}
+		switch (run[i].type) {
+			case START:
+				fprintf(fp, "\t%s\n", "Start");
+				break;
+			case SPLIT:
+				fprintf(fp, "\t%s\n", "Split");
+				break;
+			case SKIP:
+				fprintf(fp, "\t%s\n", "Skip");
+				break;
+			case PAUSE:
+				fprintf(fp, "\t%s\n", "Pause");
+				break;
+			case RESUME:
+				fprintf(fp, "\t%s\n", "Resume");
+				break;
+			case STOP:
+				fprintf(fp, "\t%s\n", "Stop");
+				break;
+		}
+		if (i == 0) {
+			char buf[25];
+			timespecToRFC3339(run[i].time, buf);
+			fprintf(fp, "\t\t%s\n", buf);
+		}
+		else {
+			sub_timespec(run[i - 1].time, run[i].time, &delta);
+			fprintf(fp, "\t\t%d\n", timespecToMS(delta));
+		}
+		i++;
+	}
+
+	fprintf(fp, "\n");
+	fclose(fp);
+}
+
+void timespecToRFC3339(struct timespec t, char buf[])
+{
+	const int tmpsize = 21;
+	struct tm tm;
+	gmtime_r(&t.tv_sec, &tm);
+	strftime(buf, tmpsize, "%Y-%m-%d %H:%M:%S.", &tm);
+	sprintf(buf + tmpsize - 1, "%03luZ", (t.tv_nsec / 1000000));
 }
 
 void loadFiles()
