@@ -41,6 +41,7 @@ int runMarker2   = 0;
 
 //save file stuff
 char *default_file_name = "untitled.quest";
+int run_count = 0;
 int files = 0;
 char **filePaths = NULL;
 char **names, **values;
@@ -294,6 +295,7 @@ void appendRunToFile()
 
 	fprintf(fp, "\n");
 	fclose(fp);
+	run_count++;
 	runUnsaved = false;
 }
 
@@ -319,10 +321,14 @@ void loadFiles()
 		while(1) {
 			if (!fgets(buff, 255, fp))
 				break;
-			if (buff[0] == '/' && buff[1] == '/' || buff[0] == '\n')
+			if (buff[0] == '/' && buff[1] == '/' || buff[0] == '\n' || buff[0] == '\t')
 				continue;
 			if (!strcmp(buff, "Segment\n") || !strcmp(buff, "Route\n"))
-				break;
+				continue;
+			if (!strcmp(buff, "Run\n")) {
+				run_count++;
+				continue;
+			}
 			if (!fgets(buff2, 255, fp))
 				break;
 			if (buff2[0] == '\t') {
@@ -347,6 +353,7 @@ void loadFiles()
 	for (int i = 0; i < valuecount; i++) {
 		printf("%s | %s", names[i], values[i]);
 	}
+	printf("%d\n", run_count);
 }
 
 //TODO: eventually file loading should support loading multiple files

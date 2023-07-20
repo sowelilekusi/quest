@@ -64,7 +64,7 @@ int timestringDigits(int ms)
 void printbig(int x, int y, int ms)
 {
 	char small[13];
-	timestring(&small, ms);
+	timestring(small, ms);
 	if (w < strlen(small)) {
 		printf("2smol\n");
 		return;
@@ -194,18 +194,20 @@ int main (int argc, char *argv[])
 
 	//Request foreground color from config file
 	fp = popen("./result/bin/quest-log foreground", "r");
-	fgets(path, sizeof(path), fp);
-	if (strcmp(path, "DATA NOT PRESENT"))
-		processColorString(&f, path);
-	printf("\033[38;2;%d;%d;%dm", f.r, f.g, f.b);
+	if (fgets(path, sizeof(path), fp)) {
+		if (strcmp(path, "DATA NOT PRESENT"))
+			processColorString(&f, path);
+		printf("\033[38;2;%d;%d;%dm", f.r, f.g, f.b);
+	}
 	pclose(fp);
 
 	//Request background color from config file
 	fp = popen("./result/bin/quest-log background", "r");
-	fgets(path, sizeof(path), fp);
-	if (strcmp(path, "DATA NOT PRESENT"))
-		processColorString(&b, path);
-	printf("\033[48;2;%d;%d;%dm", b.r, b.g, b.b);
+	if (fgets(path, sizeof(path), fp)) {
+		if (strcmp(path, "DATA NOT PRESENT"))
+			processColorString(&b, path);
+		printf("\033[48;2;%d;%d;%dm", b.r, b.g, b.b);
+	}
 	pclose(fp);
 
 	//Set fps from command line argument
