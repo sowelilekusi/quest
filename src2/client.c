@@ -74,6 +74,8 @@ int main(int argc, char *argv[]) {
 		commandcode = 12;
 	} else if (!strcmp(argv[1], "save")) {
 		commandcode = 13;
+	} else if (!strcmp(argv[1], "count")) {
+		commandcode = 14;
 	} else {
 		perror("No valid command given");
 		exit(1);
@@ -91,7 +93,7 @@ int main(int argc, char *argv[]) {
 	//bzero(buffer,256);
 	
 	//read an int response
-	if (commandcode < 11) {
+	if (commandcode < 11 || commandcode == 14) {
 		int x = -1;
 		n = read(sockfd, &x, sizeof(int));
 

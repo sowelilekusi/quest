@@ -30,6 +30,11 @@ struct run_event {
 	enum event_type type;
 	struct timespec time;
 };
+struct segment {
+	char *shortname;
+	char *longname;
+	char *description;
+};
 
 char* current_category = NULL;
 char* current_route = NULL;
@@ -46,6 +51,8 @@ int files = 0;
 char **filePaths = NULL;
 char **names, **values;
 int valuecount;
+struct segment *segments;
+int segment_count = 0;
 
 //functions
 void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td);
@@ -66,9 +73,11 @@ void resume();
 void appendRunToFile();
 void timespecToRFC3339(struct timespec t, char buf[]);
 void loadFiles();
+void add_segment(char *sname, char *lname, char *desc);
 void addFile(char *path);
 void sendTime(int sock);
 void sendValue(int sock, char* name);
+void sendInt(int sock, int value);
 void doprocessing (int sock);
 
 
@@ -323,7 +332,38 @@ void loadFiles()
 				break;
 			if (buff[0] == '/' && buff[1] == '/' || buff[0] == '\n' || buff[0] == '\t')
 				continue;
-			if (!strcmp(buff, "Segment\n") || !strcmp(buff, "Route\n"))
+			if (!strcmp(buff, "Segment\n")) {
+				char *s = NULL;
+				char *l = NULL;
+				char *d = NULL;
+//"\t\tStory 12\n\0"
+				for (int x = 0; x < 3; x++) {
+					if (!fgets(buff2, 255, fp))
+						break;
+					if (!strcmp(buff2, "\tShortname\n")) {
+						if (!fgets(buff2, 255, fp))
+							break;
+						s = malloc(strlen(buff2) - 2);
+						s = strncpy(s, buff2 + 2, strlen(buff2) - 2);
+						s[strlen(s) - 1] = '\0';
+					} else if (!strcmp(buff2, "\tLongname\n")) {
+						if (!fgets(buff2, 255, fp))
+							break;
+						l = malloc(strlen(buff2) - 2);
+						l = strncpy(l, buff2 + 2, strlen(buff2) - 2);
+						l[strlen(l) - 1] = '\0';
+					} else if (!strcmp(buff2, "\tDescription\n")) {
+						if (!fgets(buff2, 255, fp))
+							break;
+						d = malloc(strlen(buff2) - 2);
+						d = strncpy(d, buff2 + 2, strlen(buff2) - 2);
+						d[strlen(d) - 1] = '\0';
+					}
+				}
+				add_segment(s, l, d);
+				continue;
+			}
+			if (!strcmp(buff, "Route\n"))
 				continue;
 			if (!strcmp(buff, "Run\n")) {
 				run_count++;
@@ -353,7 +393,21 @@ void loadFiles()
 	for (int i = 0; i < valuecount; i++) {
 		printf("%s | %s", names[i], values[i]);
 	}
+	//Print segments
+	for (int i = 0; i < segment_count; i++) {
+		printf("Segment %d: %s\n", i, segments[i].shortname);
+	}
+	//Print run count
 	printf("%d\n", run_count);
+}
+
+void add_segment(char *sname, char *lname, char *desc)
+{
+	segment_count++;
+	segments = realloc(segments, sizeof(struct segment) * segment_count);
+	segments[segment_count - 1].shortname = sname;
+	segments[segment_count - 1].longname = lname;
+	segments[segment_count - 1].description = desc;
 }
 
 //TODO: eventually file loading should support loading multiple files
@@ -399,6 +453,15 @@ void sendValue(int sock, char* name)
 	else
 		n = write(sock, "DATA NOT PRESENT", 17);
 
+	if (n < 0) {
+		perror("ERROR writing to socket");
+		exit(1);
+	}
+}
+
+void sendInt(int sock, int value)
+{
+	int n = write(sock, &value, sizeof(int));
 	if (n < 0) {
 		perror("ERROR writing to socket");
 		exit(1);
@@ -454,6 +517,9 @@ void doprocessing (int sock)
 	} else if (commandcode == 13) {
 		printf("Recieved save command\n");
 		appendRunToFile();
+	} else if (commandcode == 14) {
+		printf("Recieved request for run count\n");
+		sendInt(sock, run_count);
 	} else {
 		printf("Recieved invalid command code, ignoring...\n");
 	}
