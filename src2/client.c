@@ -72,6 +72,8 @@ int main(int argc, char *argv[]) {
 		commandcode = 11;
 	} else if (!strcmp(argv[1], "background")) {
 		commandcode = 12;
+	} else if (!strcmp(argv[1], "save")) {
+		commandcode = 13;
 	} else {
 		perror("No valid command given");
 		exit(1);

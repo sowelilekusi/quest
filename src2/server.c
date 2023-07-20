@@ -16,6 +16,7 @@ int pausedTime = 0;
 bool timerActive = false;
 bool paused = false;
 bool alive = true;
+bool runUnsaved = false;
 int timerOffset = 0;
 enum event_type {
 	START,
@@ -127,8 +128,7 @@ void start()
 	//TODO: Save the old run to the file before the new one starts,
 	//the reason to do this here is it gives the runner a chance to undo
 	//if they accidentally hit the stop button
-	if (run[runMarker - 1].type == STOP)
-		appendRunToFile();
+	appendRunToFile();
 	//TODO: Clear the run data first
 	timerActive = true;
 	add_event(START);
@@ -141,6 +141,7 @@ void stop()
 	//this makes sure the time clients recieve from time
 	//requests match the time on the stop event
 	finish = run[runMarker - 1].time;
+	runUnsaved = true;
 }
 
 void split()
@@ -233,6 +234,8 @@ void resume()
 
 void appendRunToFile()
 {
+	if (!runUnsaved)
+		return;
 	char* save_path = NULL;
 	if (files <= 0)
 		save_path = default_file_name;
@@ -291,6 +294,7 @@ void appendRunToFile()
 
 	fprintf(fp, "\n");
 	fclose(fp);
+	runUnsaved = false;
 }
 
 void timespecToRFC3339(struct timespec t, char buf[])
@@ -310,15 +314,17 @@ void loadFiles()
 	char buff2[255];
 	
 	for (int i = 0; i < files; i++) {
+		printf("loading file: \"%s\"\n", filePaths[i]);
 		fp = fopen(filePaths[i], "r");
-
 		while(1) {
-			char *x = fgets(buff, 255, fp);
+			if (!fgets(buff, 255, fp))
+				break;
 			if (buff[0] == '/' && buff[1] == '/' || buff[0] == '\n')
 				continue;
-			if (!strcmp(buff, "Segment\n") || !strcmp(buff, "Route\n") || x == NULL)
+			if (!strcmp(buff, "Segment\n") || !strcmp(buff, "Route\n"))
 				break;
-			fgets(buff2, 255, fp);
+			if (!fgets(buff2, 255, fp))
+				break;
 			if (buff2[0] == '\t') {
 				valuecount++;
 				
@@ -438,6 +444,9 @@ void doprocessing (int sock)
 	} else if (commandcode == 12) {
 		printf("Recieved request for background color\n");
 		sendValue(sock, "Background-Color");
+	} else if (commandcode == 13) {
+		printf("Recieved save command\n");
+		appendRunToFile();
 	} else {
 		printf("Recieved invalid command code, ignoring...\n");
 	}
@@ -479,6 +488,7 @@ int main(int argc, char *argv[])
 	listen(sockfd,5);
 	clilen = sizeof(cli_addr);
 
+	printf("Ready!\n");
 	while (alive) {
 		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
 		if (newsockfd < 0) {
