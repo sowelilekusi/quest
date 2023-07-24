@@ -72,12 +72,12 @@ void timespecToRFC3339(struct timespec t, char buf[]);
 void loadFiles();
 void add_segment(char *sname, char *lname, char *desc);
 void addFile(char *path);
-void sendTime(int sock);
 void sendValue(int sock, char* name);
 void sendInt(int sock, int value);
 void doprocessing (int sock);
 void addPauseTime();
 void subtractPauseTime();
+int current_ms();
 
 //basic timer commands
 void start();
@@ -490,9 +490,8 @@ void addFile(char *path)
 	loadFiles();
 }
 
-void sendTime(int sock)
+int current_ms()
 {
-	int n, x;
 	if (timerActive)
 		clock_gettime(CLOCK_REALTIME, &finish);
 	if (paused) {
@@ -500,9 +499,14 @@ void sendTime(int sock)
 	} else {
 		sub_timespec(run[0].time, finish, &delta);
 	}
-	x = timespecToMS(delta) - pausedTime;
-	n = write(sock, &x, sizeof(int));
+	return timespecToMS(delta) - pausedTime;	
+}
 
+void sendInt(int sock, int value)
+{
+	char buffer[256];
+	strncpy(buffer, (char*)&value, sizeof(int));
+	int n = write(sock, &buffer, 256);
 	if (n < 0) {
 		perror("ERROR writing to socket");
 		exit(1);
@@ -511,6 +515,7 @@ void sendTime(int sock)
 
 void sendValue(int sock, char* name)
 {
+	char buffer[256];
 	int n, x;
 	bool namefound = false;
 	for(int i = 0; i < valuecount; i++) {
@@ -520,19 +525,10 @@ void sendValue(int sock, char* name)
 		}
 	}
 	if (namefound)
-		n = write(sock, values[x], strlen(values[x]));
+		strcpy(buffer, values[x]);
 	else
-		n = write(sock, "DATA NOT PRESENT", 17);
-
-	if (n < 0) {
-		perror("ERROR writing to socket");
-		exit(1);
-	}
-}
-
-void sendInt(int sock, int value)
-{
-	int n = write(sock, &value, sizeof(int));
+		strcpy(buffer, "DATA NOT PRESENT");
+	n = write(sock, &buffer, 256);
 	if (n < 0) {
 		perror("ERROR writing to socket");
 		exit(1);
@@ -542,78 +538,78 @@ void sendInt(int sock, int value)
 void doprocessing (int sock)
 {
 	int n;
-	char commandcode;
-	n = read(sock,&commandcode,1);
+	char buffer[256];
+	n = read(sock, &buffer, 256);
 
 	if (n < 0) {
 		perror("ERROR reading from socket");
 		exit(1);
 	}
-	if (commandcode == 1) {
+	if (!strcmp(buffer, "current_time")) {
 		//printf("Recieved time command\n");
-		sendTime(sock);
-	} else if (commandcode == 2) {
+		sendInt(sock, current_ms());
+	} else if (!strcmp(buffer, "start")) {
 		printf("Recieved start command\n");
 		start();
-	} else if (commandcode == 3) {
+	} else if (!strcmp(buffer, "stop")) {
 		printf("Recieved stop command\n");
 		stop();
-	} else if (commandcode == 4) {
+	} else if (!strcmp(buffer, "kill")) {
 		printf("Recieved kill command\n");
 		alive = false;
-	} else if (commandcode == 5) {
+	} else if (!strcmp(buffer, "split")) {
 		printf("Recieved split command\n");
 		split();
-	} else if (commandcode == 6) {
+	} else if (!strcmp(buffer, "skip")) {
 		printf("Recieved skip command\n");
 		skip();
-	} else if (commandcode == 7) {
+	} else if (!strcmp(buffer, "pause")) {
 		printf("Recieved pause command\n");
 		pause_timer();
-	} else if (commandcode == 8) {
+	} else if (!strcmp(buffer, "resume")) {
 		printf("Recieved resume command\n");
 		resume();
-	} else if (commandcode == 9) {
+	} else if (!strcmp(buffer, "undo")) {
 		printf("Recieved undo command\n");
 		undo();
-	} else if (commandcode == 10) {
+	} else if (!strcmp(buffer, "redo")) {
 		printf("Recieved redo command\n");
 		redo();
-	} else if (commandcode == 11) {
+	} else if (!strcmp(buffer, "Foreground-Color")) {
 		printf("Recieved request for foreground color\n");
 		sendValue(sock, "Foreground-Color");
-	} else if (commandcode == 12) {
+	} else if (!strcmp(buffer, "Background-Color")) {
 		printf("Recieved request for background color\n");
 		sendValue(sock, "Background-Color");
-	} else if (commandcode == 13) {
+	} else if (!strcmp(buffer, "save")) {
 		printf("Recieved save command\n");
 		appendRunToFile();
-	} else if (commandcode == 14) {
+	} else if (!strcmp(buffer, "run_count")) {
 		printf("Recieved request for run count\n");
 		sendInt(sock, run_count);
-	} else if (commandcode == 15) {
+	} else if (!strcmp(buffer, "segment_count")) {
 		printf("Recieved request for segment count\n");
 		sendInt(sock, segment_count);
-	} else if (commandcode == 16) {
+	} else if (!strcmp(buffer, "start_split_stop")) {
 		printf("Recieved start_split_stop command\n");
 		start_split_stop();
-	} else if (commandcode == 17) {
+	} else if (!strcmp(buffer, "pause_resume")) {
 		printf("Recieved pause_resume command\n");
 		pause_resume();
-	} else if (commandcode == 18) {
+	} else if (!strcmp(buffer, "start-stop")) {
 		printf("Recieved start-stop command\n");
 		start_stop();
-	} else if (commandcode == 19) {
+	} else if (!strcmp(buffer, "start-split")) {
 		printf("Recieved start-split command\n");
 		start_split();
-	} else if (commandcode == 20) {
+	} else if (!strcmp(buffer, "split-stop")) {
 		printf("Recieved split-stop command\n");
 		split_stop();
-	} else if (commandcode == 21) {
+	} else if (!strcmp(buffer, "undo-redo")) {
 		printf("Recieved undo-redo command\n");
 		undo_redo();
 	} else {
-		printf("Recieved invalid command code, ignoring...\n");
+		printf("Recieved invalid command, ignoring...\n");
 	}
 }
 

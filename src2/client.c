@@ -13,7 +13,6 @@ int main(int argc, char *argv[]) {
 	struct hostent *server;
 
 	char buffer[256];
-	char commandcode;
 
 	if (argc < 2) {
 		fprintf(stderr,"usage %s command\n", argv[0]);
@@ -49,86 +48,80 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (!strcmp(argv[1], "time")) {
-		commandcode = 1;
+		strcpy(buffer, "current_time");
 	} else if (!strcmp(argv[1], "start")) {
-		commandcode = 2;
+		strcpy(buffer, "start");
 	} else if (!strcmp(argv[1], "stop")) {
-		commandcode = 3;
+		strcpy(buffer, "stop");
 	} else if (!strcmp(argv[1], "kill")) {
-		commandcode = 4;
+		strcpy(buffer, "kill");
 	} else if (!strcmp(argv[1], "split")) {
-		commandcode = 5;
+		strcpy(buffer, "split");
 	} else if (!strcmp(argv[1], "skip")) {
-		commandcode = 6;
+		strcpy(buffer, "skip");
 	} else if (!strcmp(argv[1], "pause")) {
-		commandcode = 7;
+		strcpy(buffer, "pause");
 	} else if (!strcmp(argv[1], "resume")) {
-		commandcode = 8;
+		strcpy(buffer, "resume");
 	} else if (!strcmp(argv[1], "undo")) {
-		commandcode = 9;
+		strcpy(buffer, "undo");
 	} else if (!strcmp(argv[1], "redo")) {
-		commandcode = 10;
+		strcpy(buffer, "redo");
 	} else if (!strcmp(argv[1], "foreground")) {
-		commandcode = 11;
+		strcpy(buffer, "Foreground-Color");
 	} else if (!strcmp(argv[1], "background")) {
-		commandcode = 12;
+		strcpy(buffer, "Background-Color");
 	} else if (!strcmp(argv[1], "save")) {
-		commandcode = 13;
+		strcpy(buffer, "save");
 	} else if (!strcmp(argv[1], "runs")) {
-		commandcode = 14;
+		strcpy(buffer, "run_count");
 	} else if (!strcmp(argv[1], "segments")) {
-		commandcode = 15;
+		strcpy(buffer, "segment_count");
 	} else if (!strcmp(argv[1], "start-split-stop")) {
-		commandcode = 16;
+		strcpy(buffer, "start-split-stop");
 	} else if (!strcmp(argv[1], "pause-resume")) {
-		commandcode = 17;
+		strcpy(buffer, "pause-resume");
 	} else if (!strcmp(argv[1], "start-stop")) {
-		commandcode = 18;
+		strcpy(buffer, "start-stop");
 	} else if (!strcmp(argv[1], "start-split")) {
-		commandcode = 19;
+		strcpy(buffer, "start-split");
 	} else if (!strcmp(argv[1], "split-stop")) {
-		commandcode = 20;
+		strcpy(buffer, "split-stop");
 	} else if (!strcmp(argv[1], "undo-redo")) {
-		commandcode = 21;
+		strcpy(buffer, "undo-redo");
 	} else {
 		perror("No valid command given");
 		exit(1);
 	}
 
 	/* Send message to the server */
-	n = write(sockfd, &commandcode, 1);
-
+	n = write(sockfd, &buffer, 256);
 	if (n < 0) {
 		perror("ERROR writing to socket");
 		exit(1);
 	}
 
 	/* Now read server response */
-	//bzero(buffer,256);
+	bzero(buffer,256);
+	n = read(sockfd, &buffer, 256);
 	
 	//read an int response
-	if (commandcode < 11 || commandcode == 14 || commandcode == 15) {
+	if (!strcmp(argv[1], "time") || !strcmp(argv[1], "runs") || !strcmp(argv[1], "segments")) {
 		int x = -1;
-		n = read(sockfd, &x, sizeof(int));
-
+		x = *(int*)&buffer;
 		if (n < 0) {
 			perror("ERROR reading from socket");
 			exit(1);
 		}
-
 		if (x != -1)
 			printf("%d\n",x);
 	}
 	//read a string response
 	else {
-		bzero(buffer,256);
-		n = read(sockfd, &buffer, 255);
-
 		if (n < 0) {
 			perror("ERROR reading from socket");
 			exit(1);
 		}
-
 		if (buffer != NULL)
 			printf("%s", buffer);
 	}
