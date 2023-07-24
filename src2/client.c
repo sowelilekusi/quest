@@ -74,8 +74,22 @@ int main(int argc, char *argv[]) {
 		commandcode = 12;
 	} else if (!strcmp(argv[1], "save")) {
 		commandcode = 13;
-	} else if (!strcmp(argv[1], "count")) {
+	} else if (!strcmp(argv[1], "runs")) {
 		commandcode = 14;
+	} else if (!strcmp(argv[1], "segments")) {
+		commandcode = 15;
+	} else if (!strcmp(argv[1], "start-split-stop")) {
+		commandcode = 16;
+	} else if (!strcmp(argv[1], "pause-resume")) {
+		commandcode = 17;
+	} else if (!strcmp(argv[1], "start-stop")) {
+		commandcode = 18;
+	} else if (!strcmp(argv[1], "start-split")) {
+		commandcode = 19;
+	} else if (!strcmp(argv[1], "split-stop")) {
+		commandcode = 20;
+	} else if (!strcmp(argv[1], "undo-redo")) {
+		commandcode = 21;
 	} else {
 		perror("No valid command given");
 		exit(1);
@@ -93,7 +107,7 @@ int main(int argc, char *argv[]) {
 	//bzero(buffer,256);
 	
 	//read an int response
-	if (commandcode < 11 || commandcode == 14) {
+	if (commandcode < 11 || commandcode == 14 || commandcode == 15) {
 		int x = -1;
 		n = read(sockfd, &x, sizeof(int));
 

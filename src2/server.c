@@ -16,6 +16,7 @@ int pausedTime = 0;
 bool timerActive = false;
 bool paused = false;
 bool alive = true;
+bool hasUndoneAtLeastOnce = false;
 bool runUnsaved = false;
 int timerOffset = 0;
 enum event_type {
@@ -35,8 +36,12 @@ struct segment {
 	char *longname;
 	char *description;
 };
+struct route {
+	char *name;
+	struct segment *segments;
+	int segment_count;
+};
 
-char* current_route = NULL;
 struct run_event *run;
 //Enough to hold a sm64 16 star, can realloc later
 int runMaxLength = 12;
@@ -52,6 +57,9 @@ char **names, **values;
 int valuecount;
 struct segment *segments;
 int segment_count = 0;
+struct route *routes;
+int route_count = 0;
+struct route current_route;
 
 //functions
 void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td);
@@ -59,16 +67,6 @@ void offset_timespec(int milliseconds, struct timespec* t);
 int timespecToMS(struct timespec t);
 void extend_run();
 void add_event(enum event_type t);
-void start();
-void stop();
-void split();
-void skip();
-void addPauseTime();
-void subtractPauseTime();
-void undo();
-void redo();
-void pause_timer();
-void resume();
 void appendRunToFile();
 void timespecToRFC3339(struct timespec t, char buf[]);
 void loadFiles();
@@ -78,6 +76,26 @@ void sendTime(int sock);
 void sendValue(int sock, char* name);
 void sendInt(int sock, int value);
 void doprocessing (int sock);
+void addPauseTime();
+void subtractPauseTime();
+
+//basic timer commands
+void start();
+void split();
+void stop();
+void skip();
+void undo();
+void redo();
+void pause_timer();
+void resume();
+
+//convenient combination commands
+void start_split_stop();
+void start_split();
+void split_stop();
+void start_stop();
+void pause_resume();
+void undo_redo();
 
 
 void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td)
@@ -140,11 +158,11 @@ void reset_timer()
 
 void start()
 {
+	if (timerActive) return;
 	//Save the old run to the file before the new one starts,
 	//the reason to do this here is it gives the runner a chance to undo
 	//if they accidentally hit the stop button
 	appendRunToFile();
-	//TODO: Clear the run data first
 	reset_timer();
 	timerActive = true;
 	add_event(START);
@@ -152,6 +170,7 @@ void start()
 
 void stop()
 {
+	if (!timerActive) return;
 	timerActive = false;
 	add_event(STOP);
 	//this makes sure the time clients recieve from time
@@ -160,13 +179,46 @@ void stop()
 	runUnsaved = true;
 }
 
+void start_split_stop()
+{
+	if (!timerActive) {
+		start();
+	} else {
+		if (runMarker < current_route.segment_count) {
+			split();
+		} else {
+			stop();
+		}
+	}
+}
+
+void start_split()
+{
+	if (!timerActive) start();
+	else split();
+}
+
+void split_stop()
+{
+	if (runMarker < current_route.segment_count) split();
+	else stop();
+}
+
+void start_stop()
+{
+	if (!timerActive) start();
+	else stop();
+}
+
 void split()
 {
+	if (!timerActive) return;
 	add_event(SPLIT);
 }
 
 void skip()
 {
+	if (!timerActive) return;
 	add_event(SKIP);
 }
 
@@ -198,6 +250,7 @@ void subtractPauseTime()
 
 void undo()
 {
+	if (!timerActive) return;
 	if (runMarker > 0) {
 		runMarker--;
 		if (run[runMarker].type == STOP)
@@ -210,11 +263,13 @@ void undo()
 			paused = true;
 			subtractPauseTime();
 		}
+		hasUndoneAtLeastOnce = true;
 	}
 }
 
 void redo()
 {
+	if (!timerActive) return;
 	if (runMarker < runMarker2) {
 		runMarker++;
 		if (run[runMarker - 1].type == STOP)
@@ -227,12 +282,21 @@ void redo()
 			paused = false;
 			addPauseTime();
 		}
+	} else {
+		hasUndoneAtLeastOnce = false;
 	}
+}
+
+void undo_redo()
+{
+	if (hasUndoneAtLeastOnce) redo();
+	else undo();
 }
 
 //this isnt just called pause() because that would overlap with <unistd.h>
 void pause_timer()
 {
+	if (!timerActive) return;
 	if (!paused) {
 		add_event(PAUSE);
 		paused = true;
@@ -241,11 +305,18 @@ void pause_timer()
 
 void resume()
 {
+	if (!timerActive) return;
 	if (paused) {
 		add_event(RESUME);
 		paused = false;
 		addPauseTime();
 	}
+}
+
+void pause_resume()
+{
+	if (paused) resume();
+	else pause_timer();
 }
 
 void appendRunToFile()
@@ -261,9 +332,9 @@ void appendRunToFile()
 
 	fp = fopen(save_path, "a+");
 	fprintf(fp, "%s\n", "Run");
-	if (current_route != NULL) {
+	if (current_route.name != NULL) {
 		fprintf(fp, "\t%s\n", "Route");
-		fprintf(fp, "\t\t%s\n", current_route);
+		fprintf(fp, "\t\t%s\n", current_route.name);
 	}
 
 	int i = 0;
@@ -327,7 +398,7 @@ void loadFiles()
 	
 	for (int i = 0; i < files; i++) {
 		printf("loading file: \"%s\"\n", filePaths[i]);
-		fp = fopen(filePaths[i], "r");
+		fp = fopen(filePaths[i], "r+");
 		while(1) {
 			if (!fgets(buff, 255, fp))
 				break;
@@ -520,6 +591,27 @@ void doprocessing (int sock)
 	} else if (commandcode == 14) {
 		printf("Recieved request for run count\n");
 		sendInt(sock, run_count);
+	} else if (commandcode == 15) {
+		printf("Recieved request for segment count\n");
+		sendInt(sock, segment_count);
+	} else if (commandcode == 16) {
+		printf("Recieved start_split_stop command\n");
+		start_split_stop();
+	} else if (commandcode == 17) {
+		printf("Recieved pause_resume command\n");
+		pause_resume();
+	} else if (commandcode == 18) {
+		printf("Recieved start-stop command\n");
+		start_stop();
+	} else if (commandcode == 19) {
+		printf("Recieved start-split command\n");
+		start_split();
+	} else if (commandcode == 20) {
+		printf("Recieved split-stop command\n");
+		split_stop();
+	} else if (commandcode == 21) {
+		printf("Recieved undo-redo command\n");
+		undo_redo();
 	} else {
 		printf("Recieved invalid command code, ignoring...\n");
 	}
