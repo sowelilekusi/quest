@@ -36,7 +36,6 @@ struct segment {
 	char *description;
 };
 
-char* current_category = NULL;
 char* current_route = NULL;
 struct run_event *run;
 //Enough to hold a sm64 16 star, can realloc later
@@ -133,13 +132,20 @@ void add_event(enum event_type t)
 	runMarker2 = runMarker;
 }
 
+void reset_timer()
+{
+	runMarker = 0;
+	runMarker2 = 0;
+}
+
 void start()
 {
-	//TODO: Save the old run to the file before the new one starts,
+	//Save the old run to the file before the new one starts,
 	//the reason to do this here is it gives the runner a chance to undo
 	//if they accidentally hit the stop button
 	appendRunToFile();
 	//TODO: Clear the run data first
+	reset_timer();
 	timerActive = true;
 	add_event(START);
 }
@@ -255,10 +261,6 @@ void appendRunToFile()
 
 	fp = fopen(save_path, "a+");
 	fprintf(fp, "%s\n", "Run");
-	if (current_category != NULL) {
-		fprintf(fp, "\t%s\n", "Category");
-		fprintf(fp, "\t\t%s\n", current_category);
-	}
 	if (current_route != NULL) {
 		fprintf(fp, "\t%s\n", "Route");
 		fprintf(fp, "\t\t%s\n", current_route);
@@ -320,7 +322,6 @@ void timespecToRFC3339(struct timespec t, char buf[])
 void loadFiles()
 {
 	FILE* fp;
-	//TODO: for now we're just looking for the metadata values
 	char buff[255];
 	char buff2[255];
 	
@@ -336,7 +337,6 @@ void loadFiles()
 				char *s = NULL;
 				char *l = NULL;
 				char *d = NULL;
-//"\t\tStory 12\n\0"
 				for (int x = 0; x < 3; x++) {
 					if (!fgets(buff2, 255, fp))
 						break;

@@ -147,8 +147,6 @@ applicable, or by default is matched with the last set of metadata declared by
 the time of the run directive
 
 Run
-	Category
-		Any%
 	Route
 		Magic Swordless
 	Start
