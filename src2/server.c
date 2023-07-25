@@ -575,12 +575,6 @@ void doprocessing (int sock)
 	} else if (!strcmp(token, "redo")) {
 		printf("Recieved redo command\n");
 		redo();
-	} else if (!strcmp(token, "Foreground-Color")) {
-		printf("Recieved request for foreground color\n");
-		sendValue(sock, "Foreground-Color");
-	} else if (!strcmp(token, "Background-Color")) {
-		printf("Recieved request for background color\n");
-		sendValue(sock, "Background-Color");
 	} else if (!strcmp(token, "save")) {
 		printf("Recieved save command\n");
 		appendRunToFile();
@@ -613,6 +607,10 @@ void doprocessing (int sock)
 		int x = atoi(token);
 		printf("Recieved request for segment %s's name: %s\n", token, segments[x].shortname);
 		sendString(sock, segments[x].shortname);
+	} else if (!strcmp(token, "meta")) {
+		token = strtok(NULL, " ");
+		printf("Recieved request for [%s] meta-data tag\n", token);
+		sendValue(sock, token);
 	} else {
 		printf("Recieved invalid command, ignoring...\n");
 	}
