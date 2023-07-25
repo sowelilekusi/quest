@@ -72,8 +72,9 @@ void timespecToRFC3339(struct timespec t, char buf[]);
 void loadFiles();
 void add_segment(char *sname, char *lname, char *desc);
 void addFile(char *path);
-void sendValue(int sock, char* name);
 void sendInt(int sock, int value);
+void sendValue(int sock, char* name);
+void sendString(int sock, char* str);
 void doprocessing (int sock);
 void addPauseTime();
 void subtractPauseTime();
@@ -397,7 +398,6 @@ void loadFiles()
 	char buff2[255];
 	
 	for (int i = 0; i < files; i++) {
-		printf("loading file: \"%s\"\n", filePaths[i]);
 		fp = fopen(filePaths[i], "r+");
 		while(1) {
 			if (!fgets(buff, 255, fp))
@@ -459,17 +459,6 @@ void loadFiles()
 
 		fclose(fp);
 	}
-	
-	//Print metadata arrays
-	for (int i = 0; i < valuecount; i++) {
-		printf("%s | %s", names[i], values[i]);
-	}
-	//Print segments
-	for (int i = 0; i < segment_count; i++) {
-		printf("Segment %d: %s\n", i, segments[i].shortname);
-	}
-	//Print run count
-	printf("%d\n", run_count);
 }
 
 void add_segment(char *sname, char *lname, char *desc)
@@ -505,7 +494,7 @@ int current_ms()
 void sendInt(int sock, int value)
 {
 	char buffer[256];
-	strncpy(buffer, (char*)&value, sizeof(int));
+	sprintf(buffer, "%d", value);
 	int n = write(sock, &buffer, 256);
 	if (n < 0) {
 		perror("ERROR writing to socket");
@@ -535,79 +524,95 @@ void sendValue(int sock, char* name)
 	}
 }
 
+void sendString(int sock, char* str)
+{
+	char buffer[256];
+	strcpy(buffer, str);
+	int n = write(sock, &buffer, 256);
+	if (n < 0) {
+		perror("ERROR writing to socket");
+		exit(1);
+	}
+}
+
 void doprocessing (int sock)
 {
 	int n;
 	char buffer[256];
 	n = read(sock, &buffer, 256);
-
+	char *token = strtok(buffer, " ");
 	if (n < 0) {
 		perror("ERROR reading from socket");
 		exit(1);
 	}
-	if (!strcmp(buffer, "current_time")) {
+	if (!strcmp(token, "current_time")) {
 		//printf("Recieved time command\n");
 		sendInt(sock, current_ms());
-	} else if (!strcmp(buffer, "start")) {
+	} else if (!strcmp(token, "start")) {
 		printf("Recieved start command\n");
 		start();
-	} else if (!strcmp(buffer, "stop")) {
+	} else if (!strcmp(token, "stop")) {
 		printf("Recieved stop command\n");
 		stop();
-	} else if (!strcmp(buffer, "kill")) {
+	} else if (!strcmp(token, "kill")) {
 		printf("Recieved kill command\n");
 		alive = false;
-	} else if (!strcmp(buffer, "split")) {
+	} else if (!strcmp(token, "split")) {
 		printf("Recieved split command\n");
 		split();
-	} else if (!strcmp(buffer, "skip")) {
+	} else if (!strcmp(token, "skip")) {
 		printf("Recieved skip command\n");
 		skip();
-	} else if (!strcmp(buffer, "pause")) {
+	} else if (!strcmp(token, "pause")) {
 		printf("Recieved pause command\n");
 		pause_timer();
-	} else if (!strcmp(buffer, "resume")) {
+	} else if (!strcmp(token, "resume")) {
 		printf("Recieved resume command\n");
 		resume();
-	} else if (!strcmp(buffer, "undo")) {
+	} else if (!strcmp(token, "undo")) {
 		printf("Recieved undo command\n");
 		undo();
-	} else if (!strcmp(buffer, "redo")) {
+	} else if (!strcmp(token, "redo")) {
 		printf("Recieved redo command\n");
 		redo();
-	} else if (!strcmp(buffer, "Foreground-Color")) {
+	} else if (!strcmp(token, "Foreground-Color")) {
 		printf("Recieved request for foreground color\n");
 		sendValue(sock, "Foreground-Color");
-	} else if (!strcmp(buffer, "Background-Color")) {
+	} else if (!strcmp(token, "Background-Color")) {
 		printf("Recieved request for background color\n");
 		sendValue(sock, "Background-Color");
-	} else if (!strcmp(buffer, "save")) {
+	} else if (!strcmp(token, "save")) {
 		printf("Recieved save command\n");
 		appendRunToFile();
-	} else if (!strcmp(buffer, "run_count")) {
+	} else if (!strcmp(token, "run_count")) {
 		printf("Recieved request for run count\n");
 		sendInt(sock, run_count);
-	} else if (!strcmp(buffer, "segment_count")) {
+	} else if (!strcmp(token, "segment_count")) {
 		printf("Recieved request for segment count\n");
 		sendInt(sock, segment_count);
-	} else if (!strcmp(buffer, "start_split_stop")) {
+	} else if (!strcmp(token, "start_split_stop")) {
 		printf("Recieved start_split_stop command\n");
 		start_split_stop();
-	} else if (!strcmp(buffer, "pause_resume")) {
+	} else if (!strcmp(token, "pause_resume")) {
 		printf("Recieved pause_resume command\n");
 		pause_resume();
-	} else if (!strcmp(buffer, "start-stop")) {
+	} else if (!strcmp(token, "start-stop")) {
 		printf("Recieved start-stop command\n");
 		start_stop();
-	} else if (!strcmp(buffer, "start-split")) {
+	} else if (!strcmp(token, "start-split")) {
 		printf("Recieved start-split command\n");
 		start_split();
-	} else if (!strcmp(buffer, "split-stop")) {
+	} else if (!strcmp(token, "split-stop")) {
 		printf("Recieved split-stop command\n");
 		split_stop();
-	} else if (!strcmp(buffer, "undo-redo")) {
+	} else if (!strcmp(token, "undo-redo")) {
 		printf("Recieved undo-redo command\n");
 		undo_redo();
+	} else if (!strcmp(token, "segment_name")) {
+		token = strtok(NULL, " ");
+		int x = atoi(token);
+		printf("Recieved request for segment %s's name: %s\n", token, segments[x].shortname);
+		sendString(sock, segments[x].shortname);
 	} else {
 		printf("Recieved invalid command, ignoring...\n");
 	}

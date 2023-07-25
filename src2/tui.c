@@ -193,7 +193,7 @@ int main (int argc, char *argv[])
 	char ti[13];
 
 	//Request foreground color from config file
-	fp = popen("./result/bin/quest-log foreground", "r");
+	fp = popen("./result/bin/quest-log Foreground-Color", "r");
 	if (fgets(path, sizeof(path), fp)) {
 		if (strcmp(path, "DATA NOT PRESENT"))
 			processColorString(&f, path);
@@ -202,7 +202,7 @@ int main (int argc, char *argv[])
 	pclose(fp);
 
 	//Request background color from config file
-	fp = popen("./result/bin/quest-log background", "r");
+	fp = popen("./result/bin/quest-log Background-Color", "r");
 	if (fgets(path, sizeof(path), fp)) {
 		if (strcmp(path, "DATA NOT PRESENT"))
 			processColorString(&b, path);
@@ -217,7 +217,7 @@ int main (int argc, char *argv[])
 	}
 	while (1) {
 		int time = 0;
-		fp = popen("./result/bin/quest-log time", "r");
+		fp = popen("./result/bin/quest-log current_time", "r");
 		if (fp == NULL) {
 			printf("Failed to run command\n");
 			exit(1);
