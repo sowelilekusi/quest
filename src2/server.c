@@ -577,6 +577,8 @@ void doprocessing (int sock)
 		sendInt(sock, run_count);
 	} else if (!strcmp(token, "segment_count")) {
 		sendInt(sock, segment_count);
+	} else if (!strcmp(token, "event_count")) {
+		sendInt(sock, runMarker);
 	} else if (!strcmp(token, "start-split-stop")) {
 		start_split_stop();
 	} else if (!strcmp(token, "pause-resume")) {
@@ -593,6 +595,18 @@ void doprocessing (int sock)
 		token = strtok(NULL, " ");
 		int x = atoi(token);
 		sendString(sock, segments[x].shortname);
+	} else if (!strcmp(token, "event_time")) {
+		token = strtok(NULL, " ");
+		int x;
+		if (!strcmp(token, "last"))
+			x = runMarker - 1;
+		else if (!strcmp(token, "first"))
+			x = 0;
+		else
+			x = atoi(token);
+		struct timespec t;
+		sub_timespec(run[0].time, run[x].time, &t);
+		sendInt(sock, timespecToMS(t));
 	} else if (!strcmp(token, "meta")) {
 		token = strtok(NULL, " ");
 		sendValue(sock, token);
