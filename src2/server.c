@@ -149,6 +149,7 @@ void add_event(enum event_type t)
 		offset_timespec(timerOffset, &run[runMarker].time);
 	runMarker++;
 	runMarker2 = runMarker;
+	hasUndoneAtLeastOnce = false;
 }
 
 void reset_timer()
@@ -251,11 +252,12 @@ void subtractPauseTime()
 
 void undo()
 {
-	if (!timerActive) return;
 	if (runMarker > 0) {
 		runMarker--;
-		if (run[runMarker].type == STOP)
+		if (run[runMarker].type == STOP) {
 			timerActive = true;
+			runUnsaved = false;
+		}
 		if (run[runMarker].type == START)
 			timerActive = false;
 		if (run[runMarker].type == PAUSE)
@@ -273,8 +275,11 @@ void redo()
 	if (!timerActive) return;
 	if (runMarker < runMarker2) {
 		runMarker++;
-		if (run[runMarker - 1].type == STOP)
+		if (run[runMarker - 1].type == STOP) {
 			timerActive = false;
+			runUnsaved = true;
+			finish = run[runMarker - 1].time;
+		}
 		if (run[runMarker - 1].type == START)
 			timerActive = true;
 		if (run[runMarker - 1].type == PAUSE)
@@ -283,7 +288,8 @@ void redo()
 			paused = false;
 			addPauseTime();
 		}
-	} else {
+	}
+	if (runMarker == runMarker2) {
 		hasUndoneAtLeastOnce = false;
 	}
 }
@@ -546,70 +552,49 @@ void doprocessing (int sock)
 		exit(1);
 	}
 	if (!strcmp(token, "current_time")) {
-		//printf("Recieved time command\n");
 		sendInt(sock, current_ms());
 	} else if (!strcmp(token, "start")) {
-		printf("Recieved start command\n");
 		start();
 	} else if (!strcmp(token, "stop")) {
-		printf("Recieved stop command\n");
 		stop();
 	} else if (!strcmp(token, "kill")) {
-		printf("Recieved kill command\n");
 		alive = false;
 	} else if (!strcmp(token, "split")) {
-		printf("Recieved split command\n");
 		split();
 	} else if (!strcmp(token, "skip")) {
-		printf("Recieved skip command\n");
 		skip();
 	} else if (!strcmp(token, "pause")) {
-		printf("Recieved pause command\n");
 		pause_timer();
 	} else if (!strcmp(token, "resume")) {
-		printf("Recieved resume command\n");
 		resume();
 	} else if (!strcmp(token, "undo")) {
-		printf("Recieved undo command\n");
 		undo();
 	} else if (!strcmp(token, "redo")) {
-		printf("Recieved redo command\n");
 		redo();
 	} else if (!strcmp(token, "save")) {
-		printf("Recieved save command\n");
 		appendRunToFile();
 	} else if (!strcmp(token, "run_count")) {
-		printf("Recieved request for run count\n");
 		sendInt(sock, run_count);
 	} else if (!strcmp(token, "segment_count")) {
-		printf("Recieved request for segment count\n");
 		sendInt(sock, segment_count);
-	} else if (!strcmp(token, "start_split_stop")) {
-		printf("Recieved start_split_stop command\n");
+	} else if (!strcmp(token, "start-split-stop")) {
 		start_split_stop();
-	} else if (!strcmp(token, "pause_resume")) {
-		printf("Recieved pause_resume command\n");
+	} else if (!strcmp(token, "pause-resume")) {
 		pause_resume();
 	} else if (!strcmp(token, "start-stop")) {
-		printf("Recieved start-stop command\n");
 		start_stop();
 	} else if (!strcmp(token, "start-split")) {
-		printf("Recieved start-split command\n");
 		start_split();
 	} else if (!strcmp(token, "split-stop")) {
-		printf("Recieved split-stop command\n");
 		split_stop();
 	} else if (!strcmp(token, "undo-redo")) {
-		printf("Recieved undo-redo command\n");
 		undo_redo();
 	} else if (!strcmp(token, "segment_name")) {
 		token = strtok(NULL, " ");
 		int x = atoi(token);
-		printf("Recieved request for segment %s's name: %s\n", token, segments[x].shortname);
 		sendString(sock, segments[x].shortname);
 	} else if (!strcmp(token, "meta")) {
 		token = strtok(NULL, " ");
-		printf("Recieved request for [%s] meta-data tag\n", token);
 		sendValue(sock, token);
 	} else {
 		printf("Recieved invalid command, ignoring...\n");
