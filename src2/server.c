@@ -38,8 +38,8 @@ struct segment {
 };
 struct route {
 	char *name;
-	struct segment *segments;
 	int segment_count;
+	struct segment *segments;
 };
 
 struct run_event *run;
@@ -53,7 +53,7 @@ char *default_file_name = "untitled.quest";
 int run_count = 0;
 int files = 0;
 char **filePaths = NULL;
-char **names, **values;
+char **meta_keys, **meta_values;
 int valuecount;
 struct segment *segments;
 int segment_count = 0;
@@ -75,9 +75,11 @@ void addFile(char *path);
 void sendInt(int sock, int value);
 void sendValue(int sock, char* name);
 void sendString(int sock, char* str);
-void doprocessing (int sock);
+void process_socket_input(int sock);
 void addPauseTime();
 void subtractPauseTime();
+void set_metadata(char *key, char *value);
+void save_metadata_to_file(char *token, char *token2);
 int current_ms();
 
 //basic timer commands
@@ -449,17 +451,9 @@ void loadFiles()
 			if (!fgets(buff2, 255, fp))
 				break;
 			if (buff2[0] == '\t') {
-				valuecount++;
-				
-				names = realloc(names, sizeof(char*) * valuecount);
-				names[valuecount - 1] = malloc(strlen(buff));
-				strncpy(names[valuecount - 1], buff, strlen(buff) - 1);
-				names[valuecount - 1][strlen(buff)] = '\0';
-
-				values = realloc(values, sizeof(char*) * valuecount);
-				values[valuecount - 1] = malloc(strlen(buff2) - 1);
-				strncpy(values[valuecount - 1], buff2 + 1, strlen(buff2) - 1);
-				values[valuecount - 1][strlen(buff2)] = '\0';
+				buff[strlen(buff) - 1] = '\0';
+				buff2[strlen(buff2) - 1] = '\0';
+				set_metadata(buff, buff2 + 1);
 			}
 		}
 
@@ -513,16 +507,20 @@ void sendValue(int sock, char* name)
 	char buffer[256];
 	int n, x;
 	bool namefound = false;
-	for(int i = 0; i < valuecount; i++) {
-		if (!strcmp(names[i], name)) {
-			x = i;
-			namefound = true;
-		}
-	}
-	if (namefound)
-		strcpy(buffer, values[x]);
-	else
+	if (name == NULL) {
 		strcpy(buffer, "DATA NOT PRESENT");
+	} else {
+		for(int i = 0; i < valuecount; i++) {
+			if (!strcmp(meta_keys[i], name)) {
+				x = i;
+				namefound = true;
+			}
+		}
+		if (namefound)
+			strcpy(buffer, meta_values[x]);
+		else
+			strcpy(buffer, "DATA NOT PRESENT");
+	}
 	n = write(sock, &buffer, 256);
 	if (n < 0) {
 		perror("ERROR writing to socket");
@@ -541,19 +539,59 @@ void sendString(int sock, char* str)
 	}
 }
 
-void doprocessing (int sock)
+void set_metadata(char *key, char *value)
+{
+	char key_pos = -1;
+	for (int i = 0; i < valuecount; i++)
+		if (!strcmp(meta_keys[i], key))
+			key_pos = i;
+	if (key_pos > -1) {
+		meta_values[key_pos] = realloc(meta_values[key_pos], strlen(value));
+		strncpy(meta_values[key_pos], value, strlen(value));
+		meta_values[key_pos][strlen(value)] = '\0';
+	} else {
+		valuecount++;
+				
+		meta_keys = realloc(meta_keys, sizeof(char*) * valuecount);
+		meta_keys[valuecount - 1] = malloc(strlen(key));
+		strncpy(meta_keys[valuecount - 1], key, strlen(key));
+		meta_keys[valuecount - 1][strlen(key)] = '\0';
+
+		meta_values = realloc(meta_values, sizeof(char*) * valuecount);
+		meta_values[valuecount - 1] = malloc(strlen(value));
+		strncpy(meta_values[valuecount - 1], value, strlen(value));
+		meta_values[valuecount - 1][strlen(value)] = '\0';
+	}
+}
+
+void save_metadata_to_file(char *token, char *token2)
+{
+	char* save_path = NULL;
+	if (files <= 0)
+		save_path = default_file_name;
+	else
+		save_path = filePaths[0];
+	FILE* fp;
+
+	fp = fopen(save_path, "r+");
+	fprintf(fp, "%s\n", token);
+	fprintf(fp, "\t%s\n\n", token2);
+	fclose(fp);
+}
+
+void process_socket_input(int sock)
 {
 	int n;
 	char buffer[256];
 	n = read(sock, &buffer, 256);
-	char *token = strtok(buffer, " ");
 	if (n < 0) {
 		perror("ERROR reading from socket");
 		exit(1);
 	}
-	if (!strcmp(token, "current_time")) {
-		sendInt(sock, current_ms());
-	} else if (!strcmp(token, "start")) {
+	char *token = strtok(buffer, " ");
+
+	//Imperative commands
+	if (!strcmp(token, "start")) {
 		start();
 	} else if (!strcmp(token, "stop")) {
 		stop();
@@ -573,12 +611,6 @@ void doprocessing (int sock)
 		redo();
 	} else if (!strcmp(token, "save")) {
 		appendRunToFile();
-	} else if (!strcmp(token, "run_count")) {
-		sendInt(sock, run_count);
-	} else if (!strcmp(token, "segment_count")) {
-		sendInt(sock, segment_count);
-	} else if (!strcmp(token, "event_count")) {
-		sendInt(sock, runMarker);
 	} else if (!strcmp(token, "start-split-stop")) {
 		start_split_stop();
 	} else if (!strcmp(token, "pause-resume")) {
@@ -591,27 +623,72 @@ void doprocessing (int sock)
 		split_stop();
 	} else if (!strcmp(token, "undo-redo")) {
 		undo_redo();
-	} else if (!strcmp(token, "segment_name")) {
+	
+	//Getters
+	} else if (!strcmp(token, "get")) {
 		token = strtok(NULL, " ");
-		int x = atoi(token);
-		sendString(sock, segments[x].shortname);
-	} else if (!strcmp(token, "event_time")) {
+		if (!strcmp(token, "current_time")) {
+			sendInt(sock, current_ms());
+		} else if (!strcmp(token, "run_count")) {
+			sendInt(sock, run_count);
+		} else if (!strcmp(token, "segment_count")) {
+			sendInt(sock, segment_count);
+		} else if (!strcmp(token, "route_count")) {
+			sendInt(sock, route_count);
+		} else if (!strcmp(token, "event_count")) {
+			sendInt(sock, runMarker);
+		} else if (!strcmp(token, "segment_shortname")) {
+			token = strtok(NULL, " ");
+			int x = atoi(token);
+			sendString(sock, segments[x].shortname);
+		} else if (!strcmp(token, "segment_longname")) {
+			token = strtok(NULL, " ");
+			int x = atoi(token);
+			sendString(sock, segments[x].longname);
+		} else if (!strcmp(token, "segment_description")) {
+			token = strtok(NULL, " ");
+			int x = atoi(token);
+			sendString(sock, segments[x].description);
+		} else if (!strcmp(token, "route_name")) {
+			token = strtok(NULL, " ");
+			int x = atoi(token);
+			sendString(sock, routes[x].name);
+		} else if (!strcmp(token, "route_segment_count")) {
+			token = strtok(NULL, " ");
+			int x = atoi(token);
+			sendInt(sock, routes[x].segment_count);
+		} else if (!strcmp(token, "route_segment_shortname")) {
+			token = strtok(NULL, " ");
+			int x = atoi(token);
+			token = strtok(NULL, " ");
+			int y = atoi(token);
+			sendString(sock, routes[x].segments[y].shortname);
+		} else if (!strcmp(token, "event_time")) {
+			token = strtok(NULL, " ");
+			int x;
+			if (!strcmp(token, "last"))
+				x = runMarker - 1;
+			else if (!strcmp(token, "first"))
+				x = 0;
+			else
+				x = atoi(token);
+			struct timespec t;
+			sub_timespec(run[0].time, run[x].time, &t);
+			sendInt(sock, timespecToMS(t));
+		} else if (!strcmp(token, "meta")) {
+			token = strtok(NULL, " ");
+			sendValue(sock, token);
+		}
+	
+	//Setters
+	} else if (!strcmp(token, "set")) {
 		token = strtok(NULL, " ");
-		int x;
-		if (!strcmp(token, "last"))
-			x = runMarker - 1;
-		else if (!strcmp(token, "first"))
-			x = 0;
-		else
-			x = atoi(token);
-		struct timespec t;
-		sub_timespec(run[0].time, run[x].time, &t);
-		sendInt(sock, timespecToMS(t));
-	} else if (!strcmp(token, "meta")) {
-		token = strtok(NULL, " ");
-		sendValue(sock, token);
-	} else {
-		printf("Recieved invalid command, ignoring...\n");
+		if (!strcmp(token, "meta")) {
+			token = strtok(NULL, " ");
+			char *token2 = strtok(NULL, " ");
+			set_metadata(token, token2);
+			save_metadata_to_file(token, token2);
+		}
 	}
 }
 
@@ -658,7 +735,7 @@ int main(int argc, char *argv[])
 			perror("ERROR on accept");
 			exit(1);
 		}
-		doprocessing(newsockfd);
+		process_socket_input(newsockfd);
 		close(newsockfd);
 	}
 	free(run);
