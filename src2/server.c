@@ -25,6 +25,7 @@ enum event_type {
 	SKIP,
 	PAUSE,
 	RESUME,
+	RESET,
 	STOP
 };
 struct run_event {
@@ -156,6 +157,7 @@ void add_event(enum event_type t)
 
 void reset_timer()
 {
+	pausedTime = 0;
 	runMarker = 0;
 	runMarker2 = 0;
 }
@@ -367,6 +369,9 @@ void appendRunToFile()
 				break;
 			case RESUME:
 				fprintf(fp, "\t%s\n", "Resume");
+				break;
+			case RESET:
+				fprintf(fp, "\t%s\n", "Reset");
 				break;
 			case STOP:
 				fprintf(fp, "\t%s\n", "Stop");
@@ -675,6 +680,40 @@ void process_socket_input(int sock)
 			struct timespec t;
 			sub_timespec(run[0].time, run[x].time, &t);
 			sendInt(sock, timespecToMS(t));
+		} else if (!strcmp(token, "event_type")) {
+			token = strtok(NULL, " ");
+			int x;
+			if (!strcmp(token, "last"))
+				x = runMarker - 1;
+			else if (!strcmp(token, "first"))
+				x = 0;
+			else
+				x = atoi(token);
+			char *reply;
+			switch (run[x].type) {
+				case START:
+					reply = "START";
+					break;
+				case SPLIT:
+					reply = "SPLIT";
+					break;
+				case SKIP:
+					reply = "SKIP";
+					break;
+				case PAUSE:
+					reply = "PAUSE";
+					break;
+				case RESUME:
+					reply = "RESUME";
+					break;
+				case RESET:
+					reply = "RESET";
+					break;
+				case STOP:
+					reply = "STOP";
+					break;
+			}
+			sendString(sock, reply);
 		} else if (!strcmp(token, "meta")) {
 			token = strtok(NULL, " ");
 			sendValue(sock, token);
