@@ -12,7 +12,6 @@
 #define NS_PER_S 1000000000
 
 struct timespec finish, delta;
-int pausedTime = 0;
 bool timerActive = false;
 bool paused = false;
 bool alive = true;
@@ -77,8 +76,6 @@ void sendInt(int sock, int value);
 void sendValue(int sock, char* name);
 void sendString(int sock, char* str);
 void process_socket_input(int sock);
-void addPauseTime();
-void subtractPauseTime();
 void set_metadata(char *key, char *value);
 void save_metadata_to_file(char *token, char *token2);
 void reset_timer();
@@ -160,7 +157,6 @@ void add_event(enum event_type t)
 
 void reset_timer()
 {
-	pausedTime = 0;
 	runMarker = 0;
 	runMarker2 = 0;
 }
@@ -247,32 +243,6 @@ void skip()
 	add_event(SKIP);
 }
 
-void addPauseTime()
-{
-	int pauseEvent = 0;
-	for (int i = runMarker - 2; i >= 1; i--) {
-		if (run[i].type == PAUSE) {
-			pauseEvent = i;
-			break;
-		}
-	}
-	sub_timespec(run[pauseEvent].time, run[runMarker - 1].time, &delta);
-	pausedTime += timespecToMS(delta);
-}
-
-void subtractPauseTime()
-{
-	int pauseEvent = 0;
-	for (int i = runMarker - 1; i >= i; i--) {
-		if (run[i].type == PAUSE) {
-			pauseEvent = i;
-			break;
-		}
-	}
-	sub_timespec(run[pauseEvent].time, run[runMarker].time, &delta);
-	pausedTime -= timespecToMS(delta);
-}
-
 void undo()
 {
 	if (runMarker > 0) {
@@ -287,7 +257,6 @@ void undo()
 			paused = false;
 		if (run[runMarker].type == RESUME) {
 			paused = true;
-			subtractPauseTime();
 		}
 		hasUndoneAtLeastOnce = true;
 	}
@@ -309,7 +278,6 @@ void redo()
 			paused = true;
 		if (run[runMarker - 1].type == RESUME) {
 			paused = false;
-			addPauseTime();
 		}
 	}
 	if (runMarker == runMarker2) {
@@ -339,7 +307,6 @@ void resume()
 	if (paused) {
 		add_event(RESUME);
 		paused = false;
-		addPauseTime();
 	}
 }
 
@@ -512,7 +479,7 @@ int current_ms()
 	} else {
 		sub_timespec(run[0].time, finish, &delta);
 	}
-	return timespecToMS(delta) - pausedTime;	
+	return timespecToMS(delta);	
 }
 
 void sendInt(int sock, int value)
