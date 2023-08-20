@@ -81,6 +81,7 @@ void addPauseTime();
 void subtractPauseTime();
 void set_metadata(char *key, char *value);
 void save_metadata_to_file(char *token, char *token2);
+void reset_timer();
 int current_ms();
 
 //basic timer commands
@@ -92,9 +93,11 @@ void undo();
 void redo();
 void pause_timer();
 void resume();
+void reset();
 
 //convenient combination commands
 void start_split_stop();
+void start_reset();
 void start_split();
 void split_stop();
 void start_stop();
@@ -185,6 +188,16 @@ void stop()
 	runUnsaved = true;
 }
 
+//Identical function to stop() but with a RESET event
+void reset()
+{
+	if (!timerActive) return;
+	timerActive = false;
+	add_event(RESET);
+	finish = run[runMarker - 1].time;
+	runUnsaved = true;
+}
+
 void start_split_stop()
 {
 	if (!timerActive) {
@@ -214,6 +227,12 @@ void start_stop()
 {
 	if (!timerActive) start();
 	else stop();
+}
+
+void start_reset()
+{
+	if (!timerActive) start();
+	else reset();
 }
 
 void split()
@@ -600,6 +619,8 @@ void process_socket_input(int sock)
 		start();
 	} else if (!strcmp(token, "stop")) {
 		stop();
+	} else if (!strcmp(token, "reset")) {
+		reset();
 	} else if (!strcmp(token, "kill")) {
 		alive = false;
 	} else if (!strcmp(token, "split")) {
@@ -622,6 +643,8 @@ void process_socket_input(int sock)
 		pause_resume();
 	} else if (!strcmp(token, "start-stop")) {
 		start_stop();
+	} else if (!strcmp(token, "start-reset")) {
+		start_reset();
 	} else if (!strcmp(token, "start-split")) {
 		start_split();
 	} else if (!strcmp(token, "split-stop")) {
