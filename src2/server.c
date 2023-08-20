@@ -474,11 +474,11 @@ int current_ms()
 {
 	if (timerActive)
 		clock_gettime(CLOCK_REALTIME, &finish);
-	if (paused) {
-		sub_timespec(run[0].time, run[runMarker - 1].time, &delta);
-	} else {
+	//if (paused) {
+	//	sub_timespec(run[0].time, run[runMarker - 1].time, &delta);
+	//} else {
 		sub_timespec(run[0].time, finish, &delta);
-	}
+	//}
 	return timespecToMS(delta);	
 }
 
@@ -624,6 +624,24 @@ void process_socket_input(int sock)
 		token = strtok(NULL, " ");
 		if (!strcmp(token, "current_time")) {
 			sendInt(sock, current_ms());
+		} else if (!strcmp(token, "current_time_with_pause")) {
+			int running_pause = 0;
+			struct timespec p, r;
+			bool tracking_pause = false;
+			for (int i = 0; i < runMarker; i++) {
+				if (run[i].type == PAUSE) {
+					sub_timespec(run[0].time, run[i].time, &p);
+					tracking_pause = true;
+				}
+				if (run[i].type == RESUME) {
+					sub_timespec(run[0].time, run[i].time, &r);
+					running_pause += timespecToMS(r) - timespecToMS(p);
+					tracking_pause = false;
+				} else if (i == runMarker - 1 && tracking_pause) {
+					running_pause += current_ms() - timespecToMS(p);
+				}
+			}
+			sendInt(sock, current_ms() - running_pause);
 		} else if (!strcmp(token, "run_count")) {
 			sendInt(sock, run_count);
 		} else if (!strcmp(token, "segment_count")) {
@@ -670,6 +688,35 @@ void process_socket_input(int sock)
 			struct timespec t;
 			sub_timespec(run[0].time, run[x].time, &t);
 			sendInt(sock, timespecToMS(t));
+		} else if (!strcmp(token, "event_time_with_pause")) {
+			token = strtok(NULL, " ");
+			int x;
+			if (!strcmp(token, "last"))
+				x = runMarker - 1;
+			else if (!strcmp(token, "first"))
+				x = 0;
+			else
+				x = atoi(token);
+			int running_pause = 0;
+			struct timespec p, r;
+			bool tracking_pause = false;
+			for (int i = 0; i < x; i++) {
+				if (run[i].type == PAUSE) {
+					sub_timespec(run[0].time, run[i].time, &p);
+					tracking_pause = true;
+				}
+				if (run[i].type == RESUME) {
+					sub_timespec(run[0].time, run[i].time, &r);
+					running_pause += timespecToMS(r) - timespecToMS(p);
+					tracking_pause = false;
+				} else if (i == x - 1 && tracking_pause) {
+					sub_timespec(run[0].time, run[x].time, &r);
+					running_pause += timespecToMS(r) - timespecToMS(p);
+				}
+			}
+			struct timespec t;
+			sub_timespec(run[0].time, run[x].time, &t);
+			sendInt(sock, timespecToMS(t) - running_pause);
 		} else if (!strcmp(token, "event_type")) {
 			token = strtok(NULL, " ");
 			int x;
